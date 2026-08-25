@@ -1,0 +1,38 @@
+# 构建上下文排除。
+#
+# **`.env` 必须在这里。** 即便当前的 Dockerfile 没有 COPY 它，日后有人加一句 `COPY . .`
+# 就会把密钥打进镜像层——而镜像层是不可删的历史，密钥一旦进去就等于泄露。
+# compose 里用 env_file 在运行时注入，构建期不需要它。
+.env
+.env.*
+!.env.example
+
+# 版本库与 IDE
+.git
+.gitignore
+.claude
+.workspace
+
+# Python 运行产物
+__pycache__
+*.py[cod]
+.venv
+venv
+.mypy_cache
+.pytest_cache
+.ruff_cache
+*.egg-info
+
+# 前端产物与依赖：镜像内各自重装/重建，复制进去只会拖慢上下文传输，
+# 而 node_modules 里的原生模块还可能与镜像的架构不匹配。
+frontend/node_modules
+frontend/dist
+
+# 测试与文档：不进运行镜像。
+tests
+docs
+CHANGELOG.md
+
+# 本地临时产物
+_*
+*.log

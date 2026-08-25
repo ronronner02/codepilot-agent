@@ -1,0 +1,109 @@
+U2 验证：补齐两项缺失的测试（实现欠账）
+日期：2026-08-25
+环境：Windows 11，Python 3.13.5
+
+背景
+────
+backlog 把这两项与其余条目区分开：不是「验证做不了」，是计划要求但漏写的测试。
+补上才算 U2 完成。
+
+────────────────────────────────────────────────────────────────────
+一、克隆结果级的符号链接逃逸测试
+────────────────────────────────────────────────────────────────────
+
+计划要求
+  Definition of Done 明写：符号链接逃逸测试在 U1（函数级）、U2（克隆结果级）、
+  U14（MCP 边界级）三处各有覆盖。
+
+补前状态
+  U1 有：tests/test_paths.py（含真实目录联接构造）
+  U14 有：tests/test_mcp_server.py（含经 MCP 传入联接路径被拒）
+  U2 缺：tests/test_ingest_clone.py 只测了工作目录清理（只读文件、嵌套树）
+
+新增文件
+  tests/test_ingest_clone_escape.py，4 个测试
+
+  构造：在「克隆产物」目录内建一个指向仓库外的 Windows 目录联接（junction），
+  仓库外目录放一个含 SECRET_OUTSIDE_REPO 的文件。用 junction 而非符号链接的理由：
+  Windows 上建符号链接要提权，实测报 WinError 1314，测试会被跳过 —— 而这条的
+  proof intent 是 required，跳过等于门没关。junction 免提权，同样是 reparse point。
+
+  test_parser_refuses_file_reached_through_junction
+    parse_tree(workdir, "pkg/leak/secret.py") → UnparsedFile，reason 含「路径校验未通过」
+    并断言外部文件内容一个字节都没进 reason
+  test_read_file_refuses_path_through_junction
+    read_file 工具 → ToolError，含「路径校验未通过」
+  test_list_structure_skips_junction_entry
+    list_structure("pkg") → 条目含 core.py，不含 leak；truncated_note 说明跳过原因
+    （针对 iterdir() 会穿透联接这一点：校验必须逐条做，不能只校验入口目录）
+  test_safe_file_in_same_clone_still_parses
+    反向对照：同一份克隆产物里的 pkg/core.py 仍能正常解析
+    没有这条，前三条用「什么都拒绝」也能通过 —— 那是把门焊死，不是把门看住
+
+结果
+  4 passed（无 skip —— junction 真的建上了）
+
+变异验证（确认测试真的咬住校验点，而非恰好通过）
+  临时改动：
+    backend/tools/list_structure.py    删掉循环内的 resolve_within 逐条校验
+    backend/static_analysis/parser.py  把 resolve_within 换成 repo_root / rel_path
+  变异后结果：
+    FAILED test_parser_refuses_file_reached_through_junction
+    FAILED test_list_structure_skips_junction_entry
+    2 failed, 2 passed
+  （read_file 那条仍通过，因为没变异 read_file.py —— 它有自己的校验点）
+  源码已还原，4 passed 复现。
+
+────────────────────────────────────────────────────────────────────
+二、克隆场景测试
+────────────────────────────────────────────────────────────────────
+
+计划要求
+  U2 的 Test scenarios 列了三条：合法仓库完成浅克隆、含子模块的仓库克隆后子模块
+  目录为空、克隆后 git rev-list --count HEAD 大于 1。
+
+补前状态
+  三条都无测试。已覆盖的只是纯函数部分：地址解析（test_ingest_guards.py）、
+  准入阈值（test_ingest_admission.py）、HTTP 状态映射（test_ingest_github_api.py）。
+
+取的方案
+  backlog 给了两个选项，取「本地造裸仓库」：不依赖 GitHub 可达性、不占速率额度、
+  不因网络波动变成随机失败。代价是不覆盖真实 HTTPS 传输 —— 那一层由
+  test_ingest_github_api.py 的状态映射测试与基准仓库实跑覆盖。
+
+  RepoRef.clone_url 硬编码 github.com，所以 monkeypatch 掉那个 property 指向本地
+  file:// URI。被换掉的只有「去哪儿取」；clone_repo 的浅克隆参数、子模块开关、
+  残留清理与提交计数逻辑全部照原样跑。
+  git 命令用 GIT_CONFIG_GLOBAL=/dev/null 隔离全局配置，避免开发机上的
+  commit.gpgsign 或 user.name 缺失让构造阶段失败。
+
+新增文件
+  tests/test_ingest_clone_scenarios.py，3 个测试
+
+  test_shallow_clone_succeeds_and_counts_commits
+    5 个提交的本地仓库 → workdir 存在、file0.py 存在、head_sha 长度 40、
+    commit_count == 5 且 > 1
+    这条钉住「clone_depth 不是 1」这个决定：若被改回 1，提交频次信号
+    （KTD10 依赖它）会恒为空，而界面与报告都看不出异常。
+  test_submodule_directory_stays_empty
+    含子模块的仓库 → vendor/sub 目录存在（git 会建挂载点）但内容为空，
+    主仓库自身文件不受影响
+    --no-recurse-submodules 的效果第一次被真正观察到。
+  test_stale_workdir_is_replaced_not_merged
+    预置含 leftover.py 的残留工作目录 → 克隆后 leftover.py 不存在、新文件存在
+    钉住 _remove_tree 在克隆前真的跑了（残留半成品会让解析层读到不完整的树）。
+
+结果
+  3 passed in 4.29s
+
+  注：初版用了 pytest.mark.anyio + anyio_backend fixture，与项目约定不符 ——
+  pyproject.toml 已设 asyncio_mode = "auto"，async 测试无需任何标记。已去掉。
+
+────────────────────────────────────────────────────────────────────
+全量复验
+────────────────────────────────────────────────────────────────────
+
+  python -m pytest -q    → 700 passed, 1 skipped（补前 693 passed, 1 skipped）
+  python -m mypy backend → Success: no issues found in 71 source files
+
+  新增 7 个测试：4（逃逸）+ 3（克隆场景）

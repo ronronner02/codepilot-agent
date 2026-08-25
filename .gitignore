@@ -1,0 +1,58 @@
+# spec-first:start
+# host-local scratch and settings
+.claude/tasks/
+.claude/worktrees/
+.qoder/settings.local.json
+
+# spec-first local setup and workflow runtime artifacts
+.spec-first/*.local.yaml
+.spec-first/config.local.yaml
+.spec-first/config/*.json
+.spec-first/audits/
+.spec-first/governance/
+.spec-first/app-audit/
+.spec-first/workflows/
+.spec-first/workspace/
+.spec-first/sessions/
+
+# optional provider local artifacts
+.codegraph/
+graphify-out/
+.graphify/
+# spec-first:end
+
+# ── 项目条目 ──
+
+# 密钥。安全面明确要求 API key 不入代码库与镜像。
+# .env.example 是模板，不含真实值，要入库。
+.env
+.env.*
+!.env.example
+
+# 工作区：克隆的仓库与向量索引。体积大且可重建。
+# e2e 那份同类：里面是被分析仓库的克隆产物，还带嵌套 .git，入库会让本仓库套仓库。
+.workspace/
+.workspace-e2e/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# 前端
+node_modules/
+frontend/dist/
+# tsc 的增量编译缓存，随机器与构建时刻变化。
+*.tsbuildinfo
+
+# 本地临时产物（实跑脚本、调试输出）
+_*.py
+_*.txt
+*.log

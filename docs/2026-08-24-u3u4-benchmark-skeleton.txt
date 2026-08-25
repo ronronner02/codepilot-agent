@@ -1,0 +1,563 @@
+工作目录：.workspace\repos  克隆深度：200
+
+==============================================================================
+仓库 fastapi/fastapi
+==============================================================================
+准入通过：可解析 1142 / 总 3139，体积 55589 KB
+克隆完成：HEAD c3f316b7e814，提交数 200
+语言构成（前 6）：{'Markdown': 1692, 'Python': 1138, 'Other': 249, 'YAML': 42, 'Shell': 5, 'HTML': 5}
+
+解析：文件 3139，符号级解析 1138，未解析 2001，符号 5659
+  按 grammar：{'python': 1138}
+
+依赖图：节点 1138，边 1630，外部依赖 131，未解析 import 0，环 5，粒度 file
+
+循环依赖（共 5 个，最长 4 个节点）：
+  4 节点：fastapi/__init__.py -> fastapi/applications.py -> fastapi/exception_handlers.py -> fastapi/utils.py
+  4 节点：fastapi/__init__.py -> fastapi/routing.py -> fastapi/dependencies/utils.py -> fastapi/utils.py
+  3 节点：fastapi/__init__.py -> fastapi/routing.py -> fastapi/utils.py
+
+------------------------------------------------------------------------------
+模块聚类：203 个模块  ← 核对重点：分组是否吻合作者意图
+------------------------------------------------------------------------------
+  [directory] tests                                          文件  213  内部边   13  外部边  497  内聚比   0.0
+  [directory] docs_src/dependencies                          文件   32  内部边    0  外部边   31  内聚比   0.0
+  [directory] docs_src/query_params_str_validations          文件   31  内部边    0  外部边   30  内聚比   0.0
+  [split    ] fastapi#1                                      文件   21  内部边   40  外部边   14  内聚比   2.9
+  [directory] tests/test_tutorial/test_query_params_str_vali 文件   17  内部边    0  外部边   29  内聚比   0.0
+  [directory] docs_src/custom_response                       文件   16  内部边    0  外部边   29  内聚比   0.0
+  [directory] docs_src/security                              文件   15  内部边    0  外部边   28  内聚比   0.0
+  [directory] docs_src/python_types                          文件   14  内部边    0  外部边    0  内聚比   0.0
+  [directory] tests/test_tutorial/test_custom_response       文件   14  内部边    0  外部边   24  内聚比   0.0
+  [directory] tests/test_tutorial/test_dependencies          文件   14  内部边    0  外部边   23  内聚比   0.0
+  [directory] docs_src/path_params_numeric_validations       文件   13  内部边    0  外部边   12  内聚比   0.0
+  [directory] docs_src/response_model                        文件   13  内部边    0  外部边   16  内聚比   0.0
+  [directory] tests/test_tutorial/test_python_types          文件   13  内部边    0  外部边   13  内聚比   0.0
+  [directory] scripts                                        文件   12  内部边    3  外部边    0  内聚比   3.0
+  [directory] tests/test_tutorial/test_response_model        文件   12  内部边    0  外部边   22  内聚比   0.0
+  [directory] docs_src/request_files                         文件   11  内部边    0  外部边   14  内聚比   0.0
+  [directory] docs_src/body_multiple_params                  文件   10  内部边    0  外部边    9  内聚比   0.0
+  [directory] docs_src/body_nested_models                    文件   10  内部边    0  外部边    9  内聚比   0.0
+  [directory] docs_src/schema_extra_example                  文件    9  内部边    0  外部边    8  内聚比   0.0
+  [directory] docs_src/path_operation_advanced_configuration 文件    8  内部边    0  外部边    8  内聚比   0.0
+  [directory] docs_src/path_operation_configuration          文件    8  内部边    0  外部边    7  内聚比   0.0
+  [directory] tests/test_tutorial/test_body_nested_models    文件    8  内部边    0  外部边   12  内聚比   0.0
+  [directory] tests/test_tutorial/test_path_operation_advanc 文件    8  内部边    0  外部边   13  内聚比   0.0
+  [directory] tests/test_tutorial/test_security              文件    8  内部边    0  外部边   13  内聚比   0.0
+  [directory] docs_src/frontend                              文件    7  内部边    0  外部边    6  内聚比   0.0
+  [directory] docs_src/handling_errors                       文件    7  内部边    0  外部边   14  内聚比   0.0
+  [directory] docs_src/header_param_models                   文件    7  内部边    0  外部边    6  内聚比   0.0
+  [directory] docs_src/header_params                         文件    7  内部边    0  外部边    6  内聚比   0.0
+  [directory] docs_src/path_params                           文件    7  内部边    0  外部边    6  内聚比   0.0
+  [directory] docs_src/query_params                          文件    7  内部边    0  外部边    6  内聚比   0.0
+  [directory] fastapi/middleware                             文件    7  内部边    0  外部边    0  内聚比   0.0
+  [directory] fastapi/security                               文件    7  内部边   10  外部边    8  内聚比   1.2
+  [directory] tests/test_tutorial/test_handling_errors       文件    7  内部边    0  外部边   12  内聚比   0.0
+  [directory] tests/test_tutorial/test_path_operation_config 文件    7  内部边    0  外部边   12  内聚比   0.0
+  [directory] tests/test_tutorial/test_path_params           文件    7  内部边    0  外部边   12  内聚比   0.0
+  [directory] tests/test_tutorial/test_query_params          文件    7  内部边    0  外部边   11  内聚比   0.0
+  [directory] tests/test_tutorial/test_testing               文件    7  内部边    0  外部边    7  内聚比   0.0
+  [directory] docs_src/behind_a_proxy                        文件    6  内部边    0  外部边    5  内聚比   0.0
+  [directory] docs_src/custom_request_and_route              文件    6  内部边    0  外部边   14  内聚比   0.0
+  [directory] docs_src/extra_models                          文件    6  内部边    0  外部边    5  内聚比   0.0
+  [directory] docs_src/metadata                              文件    6  内部边    0  外部边    5  内聚比   0.0
+  [directory] docs_src/server_sent_events                    文件    6  内部边    0  外部边   10  内聚比   0.0
+  [directory] tests/test_request_params/test_body            文件    6  内部边    4  外部边    8  内聚比   0.5
+  [directory] tests/test_request_params/test_file            文件    6  内部边    4  外部边    8  内聚比   0.5
+  [directory] tests/test_request_params/test_form            文件    6  内部边    4  外部边    8  内聚比   0.5
+  [directory] tests/test_tutorial/test_behind_a_proxy        文件    6  内部边    0  外部边   10  内聚比   0.0
+  [directory] tests/test_tutorial/test_body_multiple_params  文件    6  内部边    0  外部边   10  内聚比   0.0
+  [directory] tests/test_tutorial/test_metadata              文件    6  内部边    0  外部边   10  内聚比   0.0
+  [directory] tests/test_tutorial/test_path_params_numeric_v 文件    6  内部边    0  外部边    6  内聚比   0.0
+  [directory] tests/test_tutorial/test_request_files         文件    6  内部边    0  外部边    8  内聚比   0.0
+  [directory] tests/test_tutorial/test_schema_extra_example  文件    6  内部边    0  外部边   10  内聚比   0.0
+  [directory] tests/test_tutorial/test_server_sent_events    文件    6  内部边    0  外部边    5  内聚比   0.0
+  [directory] docs_src/additional_responses                  文件    5  内部边    0  外部边    8  内聚比   0.0
+  [directory] docs_src/app_testing                           文件    5  内部边    0  外部边    9  内聚比   0.0
+  [directory] docs_src/body                                  文件    5  内部边    0  外部边    4  内聚比   0.0
+  [directory] docs_src/cookie_param_models                   文件    5  内部边    0  外部边    4  内聚比   0.0
+  [directory] docs_src/generate_clients                      文件    5  内部边    0  外部边    4  内聚比   0.0
+  [directory] docs_src/pydantic_v1_in_v2                     文件    5  内部边    0  外部边    3  内聚比   0.0
+  [directory] docs_src/query_param_models                    文件    5  内部边    0  外部边    4  内聚比   0.0
+  [directory] docs_src/request_form_models                   文件    5  内部边    0  外部边    4  内聚比   0.0
+  [directory] docs_src/sql_databases                         文件    5  内部边    0  外部边    4  内聚比   0.0
+  [directory] docs_src/websockets_                           文件    5  内部边    0  外部边    8  内聚比   0.0
+  [directory] fastapi/openapi                                文件    5  内部边    2  外部边   15  内聚比   0.1
+  [directory] scripts/playwright/separate_openapi_schemas    文件    5  内部边    0  外部边    0  内聚比   0.0
+  [directory] tests/test_request_params/test_cookie          文件    5  内部边    0  外部边    4  内聚比   0.0
+  [directory] tests/test_request_params/test_header          文件    5  内部边    0  外部边    8  内聚比   0.0
+  [directory] tests/test_request_params/test_path            文件    5  内部边    0  外部边    2  内聚比   0.0
+  [directory] tests/test_request_params/test_query           文件    5  内部边    0  外部边    8  内聚比   0.0
+  [directory] tests/test_tutorial/test_additional_responses  文件    5  内部边    0  外部边    8  内聚比   0.0
+  [directory] tests/test_tutorial/test_body                  文件    5  内部边    0  外部边    8  内聚比   0.0
+  [directory] tests/test_tutorial/test_extra_models          文件    5  内部边    0  外部边    6  内聚比   0.0
+  [directory] tests/test_tutorial/test_generate_clients      文件    5  内部边    0  外部边    6  内聚比   0.0
+  [directory] tests/test_tutorial/test_settings              文件    5  内部边    0  外部边    5  内聚比   0.0
+  [directory] docs_src/advanced_middleware                   文件    4  内部边    0  外部边    6  内聚比   0.0
+  [directory] docs_src/background_tasks                      文件    4  内部边    0  外部边    3  内聚比   0.0
+  [directory] docs_src/configure_swagger_ui                  文件    4  内部边    0  外部边    3  内聚比   0.0
+  [directory] docs_src/dataclasses_                          文件    4  内部边    0  外部边    3  内聚比   0.0
+  [directory] docs_src/events                                文件    4  内部边    0  外部边    3  内聚比   0.0
+  [directory] docs_src/settings/app02_an_py310               文件    4  内部边    3  外部边    2  内聚比   1.5
+  [directory] docs_src/settings/app02_py310                  文件    4  内部边    3  外部边    2  内聚比   1.5
+  [directory] scripts/tests/test_translation_fixer/test_code 文件    4  内部边    0  外部边    4  内聚比   0.0
+  [directory] tests/benchmarks                               文件    4  内部边    1  外部边    3  内聚比   0.3
+  [directory] tests/memory_benchmarks                        文件    4  内部边    0  外部边    5  内聚比   0.0
+  [directory] tests/test_modules_same_name_body/app          文件    4  内部边    2  外部边    3  内聚比   0.7
+  [directory] tests/test_tutorial/test_advanced_middleware   文件    4  内部边    0  外部边    7  内聚比   0.0
+  [directory] tests/test_tutorial/test_configure_swagger_ui  文件    4  内部边    0  外部边    6  内聚比   0.0
+  [directory] tests/test_tutorial/test_custom_request_and_ro 文件    4  内部边    0  外部边    8  内聚比   0.0
+  [directory] tests/test_tutorial/test_dataclasses           文件    4  内部边    0  外部边    6  内聚比   0.0
+  [directory] tests/test_tutorial/test_events                文件    4  内部边    0  外部边    9  内聚比   0.0
+  [directory] tests/test_tutorial/test_header_param_models   文件    4  内部边    0  外部边    6  内聚比   0.0
+  [directory] tests/test_tutorial/test_header_params         文件    4  内部边    0  外部边    6  内聚比   0.0
+  [directory] tests/test_tutorial/test_websockets            文件    4  内部边    0  外部边    9  内聚比   0.0
+  [directory] docs_src/additional_status_codes               文件    3  内部边    0  外部边    4  内聚比   0.0
+  [directory] docs_src/app_testing/app_a_py310               文件    3  内部边    1  外部边    2  内聚比   0.5
+  [directory] docs_src/app_testing/app_b_an_py310            文件    3  内部边    1  外部边    2  内聚比   0.5
+  [directory] docs_src/app_testing/app_b_py310               文件    3  内部边    1  外部边    2  内聚比   0.5
+  [directory] docs_src/async_tests/app_a_py310               文件    3  内部边    1  外部边    1  内聚比   1.0
+  [directory] docs_src/bigger_applications/app_an_py310      文件    3  内部边    1  外部边    5  内聚比   0.2
+  [directory] docs_src/bigger_applications/app_an_py310/rout 文件    3  内部边    0  外部边    3  内聚比   0.0
+  [directory] docs_src/body_fields                           文件    3  内部边    0  外部边    2  内聚比   0.0
+  [directory] docs_src/body_updates                          文件    3  内部边    0  外部边    4  内聚比   0.0
+  [directory] docs_src/cookie_params                         文件    3  内部边    0  外部边    2  内聚比   0.0
+  [directory] docs_src/custom_docs_ui                        文件    3  内部边    0  外部边    5  内聚比   0.0
+  [directory] docs_src/dependency_testing                    文件    3  内部边    0  外部边    4  内聚比   0.0
+  [directory] docs_src/extra_data_types                      文件    3  内部边    0  外部边    2  内聚比   0.0
+  [directory] docs_src/first_steps                           文件    3  内部边    0  外部边    2  内聚比   0.0
+  [directory] docs_src/request_forms                         文件    3  内部边    0  外部边    2  内聚比   0.0
+  [directory] docs_src/request_forms_and_files               文件    3  内部边    0  外部边    2  内聚比   0.0
+  [directory] docs_src/response_cookies                      文件    3  内部边    0  外部边    3  内聚比   0.0
+  [directory] docs_src/response_directly                     文件    3  内部边    0  外部边    4  内聚比   0.0
+  [directory] docs_src/response_headers                      文件    3  内部边    0  外部边    3  内聚比   0.0
+  [directory] docs_src/response_status_code                  文件    3  内部边    0  外部边    2  内聚比   0.0
+  [directory] docs_src/separate_openapi_schemas              文件    3  内部边    0  外部边    2  内聚比   0.0
+  [directory] docs_src/settings/app01_py310                  文件    3  内部边    1  外部边    1  内聚比   1.0
+  [directory] docs_src/settings/app03_an_py310               文件    3  内部边    1  外部边    1  内聚比   1.0
+  [directory] docs_src/settings/app03_py310                  文件    3  内部边    1  外部边    1  内聚比   1.0
+  [directory] docs_src/stream_data                           文件    3  内部边    0  外部边    4  内聚比   0.0
+  [directory] fastapi/_compat                                文件    3  内部边    3  外部边    4  内聚比   0.8
+  [directory] fastapi/dependencies                           文件    3  内部边    1  外部边   12  内聚比   0.1
+  [directory] tests/test_tutorial/test_background_tasks      文件    3  内部边    0  外部边    5  内聚比   0.0
+  [directory] tests/test_tutorial/test_body_updates          文件    3  内部边    0  外部边    4  内聚比   0.0
+  [directory] tests/test_tutorial/test_cookie_param_models   文件    3  内部边    0  外部边    4  内聚比   0.0
+  [directory] tests/test_tutorial/test_custom_docs_ui        文件    3  内部边    0  外部边    6  内聚比   0.0
+  [directory] tests/test_tutorial/test_query_param_models    文件    3  内部边    0  外部边    4  内聚比   0.0
+  [directory] tests/test_tutorial/test_request_form_models   文件    3  内部边    0  外部边    2  内聚比   0.0
+  [directory] tests/test_tutorial/test_response_cookies      文件    3  内部边    0  外部边    4  内聚比   0.0
+  [directory] tests/test_tutorial/test_response_directly     文件    3  内部边    0  外部边    3  内聚比   0.0
+  [directory] tests/test_tutorial/test_response_headers      文件    3  内部边    0  外部边    4  内聚比   0.0
+  [directory] tests/test_tutorial/test_separate_openapi_sche 文件    3  内部边    0  外部边    4  内聚比   0.0
+  [directory] tests/test_tutorial/test_sql_databases         文件    3  内部边    0  外部边    4  内聚比   0.0
+  [directory] tests/test_tutorial/test_stream_data           文件    3  内部边    0  外部边    2  内聚比   0.0
+  [directory] tests/test_validate_response_recursive         文件    3  内部边    1  外部边    2  内聚比   0.5
+  [directory] docs_src/authentication_error_status_code      文件    2  内部边    0  外部边    2  内聚比   0.0
+  [directory] docs_src/bigger_applications/app_an_py310/inte 文件    2  内部边    0  外部边    1  内聚比   0.0
+  [directory] docs_src/conditional_openapi                   文件    2  内部边    0  外部边    1  内聚比   0.0
+  [directory] docs_src/cors                                  文件    2  内部边    0  外部边    2  内聚比   0.0
+  [directory] docs_src/debugging                             文件    2  内部边    0  外部边    1  内聚比   0.0
+  [directory] docs_src/encoder                               文件    2  内部边    0  外部边    2  内聚比   0.0
+  [directory] docs_src/extending_openapi                     文件    2  内部边    0  外部边    2  内聚比   0.0
+  [directory] docs_src/graphql_                              文件    2  内部边    0  外部边    1  内聚比   0.0
+  [directory] docs_src/json_base64_bytes                     文件    2  内部边    0  外部边    1  内聚比   0.0
+  [directory] docs_src/middleware                            文件    2  内部边    0  外部边    1  内聚比   0.0
+  [directory] docs_src/openapi_callbacks                     文件    2  内部边    0  外部边    1  内聚比   0.0
+  [directory] docs_src/openapi_webhooks                      文件    2  内部边    0  外部边    1  内聚比   0.0
+  [directory] docs_src/response_change_status_code           文件    2  内部边    0  外部边    1  内聚比   0.0
+  [directory] docs_src/settings                              文件    2  内部边    0  外部边    1  内聚比   0.0
+  [directory] docs_src/static_files                          文件    2  内部边    0  外部边    2  内聚比   0.0
+  [directory] docs_src/stream_json_lines                     文件    2  内部边    0  外部边    1  内聚比   0.0
+  [directory] docs_src/strict_content_type                   文件    2  内部边    0  外部边    1  内聚比   0.0
+  [directory] docs_src/sub_applications                      文件    2  内部边    0  外部边    1  内聚比   0.0
+  [directory] docs_src/templates                             文件    2  内部边    0  外部边    4  内聚比   0.0
+  [directory] docs_src/using_request_directly                文件    2  内部边    0  外部边    1  内聚比   0.0
+  [directory] docs_src/wsgi                                  文件    2  内部边    0  外部边    1  内聚比   0.0
+  [split    ] fastapi#2                                      文件    2  内部边    1  外部边    0  内聚比   1.0
+  [directory] scripts/playwright/sql_databases               文件    2  内部边    0  外部边    0  内聚比   0.0
+  [directory] scripts/tests/test_translation_fixer/test_head 文件    2  内部边    0  外部边    2  内聚比   0.0
+  [directory] tests/test_modules_same_name_body              文件    2  内部边    0  外部边    2  内聚比   0.0
+  [directory] tests/test_tutorial/test_additional_status_cod 文件    2  内部边    0  外部边    2  内聚比   0.0
+  [directory] tests/test_tutorial/test_async_tests           文件    2  内部边    0  外部边    1  内聚比   0.0
+  [directory] tests/test_tutorial/test_authentication_error_ 文件    2  内部边    0  外部边    1  内聚比   0.0
+  [directory] tests/test_tutorial/test_bigger_applications   文件    2  内部边    0  外部边    1  内聚比   0.0
+  [directory] tests/test_tutorial/test_body_fields           文件    2  内部边    0  外部边    2  内聚比   0.0
+  [directory] tests/test_tutorial/test_conditional_openapi   文件    2  内部边    0  外部边    2  内聚比   0.0
+  [directory] tests/test_tutorial/test_cookie_params         文件    2  内部边    0  外部边    3  内聚比   0.0
+  [directory] tests/test_tutorial/test_cors                  文件    2  内部边    0  外部边    2  内聚比   0.0
+  [directory] tests/test_tutorial/test_debugging             文件    2  内部边    0  外部边    1  内聚比   0.0
+  [directory] tests/test_tutorial/test_encoder               文件    2  内部边    0  外部边    3  内聚比   0.0
+  [directory] tests/test_tutorial/test_extending_openapi     文件    2  内部边    0  外部边    2  内聚比   0.0
+  [directory] tests/test_tutorial/test_extra_data_types      文件    2  内部边    0  外部边    2  内聚比   0.0
+  [directory] tests/test_tutorial/test_first_steps           文件    2  内部边    0  外部边    1  内聚比   0.0
+  [directory] tests/test_tutorial/test_graphql               文件    2  内部边    0  外部边    1  内聚比   0.0
+  [directory] tests/test_tutorial/test_json_base64_bytes     文件    2  内部边    0  外部边    2  内聚比   0.0
+  [directory] tests/test_tutorial/test_middleware            文件    2  内部边    0  外部边    2  内聚比   0.0
+  [directory] tests/test_tutorial/test_openapi_callbacks     文件    2  内部边    0  外部边    3  内聚比   0.0
+  [directory] tests/test_tutorial/test_openapi_webhooks      文件    2  内部边    0  外部边    3  内聚比   0.0
+  [directory] tests/test_tutorial/test_request_forms         文件    2  内部边    0  外部边    1  内聚比   0.0
+  [directory] tests/test_tutorial/test_request_forms_and_fil 文件    2  内部边    0  外部边    2  内聚比   0.0
+  [directory] tests/test_tutorial/test_response_change_statu 文件    2  内部边    0  外部边    2  内聚比   0.0
+  [directory] tests/test_tutorial/test_response_status_code  文件    2  内部边    0  外部边    1  内聚比   0.0
+  [directory] tests/test_tutorial/test_static_files          文件    2  内部边    0  外部边    3  内聚比   0.0
+  [directory] tests/test_tutorial/test_stream_json_lines     文件    2  内部边    0  外部边    1  内聚比   0.0
+  [directory] tests/test_tutorial/test_strict_content_type   文件    2  内部边    0  外部边    1  内聚比   0.0
+  [directory] tests/test_tutorial/test_sub_applications      文件    2  内部边    0  外部边    2  内聚比   0.0
+  [directory] tests/test_tutorial/test_templates             文件    2  内部边    0  外部边    3  内聚比   0.0
+  [directory] tests/test_tutorial/test_testing_dependencies  文件    2  内部边    0  外部边    2  内聚比   0.0
+  [directory] tests/test_tutorial/test_using_request_directl 文件    2  内部边    0  外部边    2  内聚比   0.0
+  [directory] tests/test_tutorial/test_wsgi                  文件    2  内部边    0  外部边    2  内聚比   0.0
+  [directory] docs_src/async_tests                           文件    1  内部边    0  外部边    0  内聚比   0.0
+  [directory] docs_src/bigger_applications                   文件    1  内部边    0  外部边    0  内聚比   0.0
+  [directory] docs_src/templates/static                      文件    1  内部边    0  外部边    0  内聚比   0.0
+  [directory] docs_src/templates/templates                   文件    1  内部边    0  外部边    0  内聚比   0.0
+  [directory] scripts/playwright/cookie_param_models         文件    1  内部边    0  外部边    0  内聚比   0.0
+  [directory] scripts/playwright/header_param_models         文件    1  内部边    0  外部边    0  内聚比   0.0
+  [directory] scripts/playwright/json_base64_bytes           文件    1  内部边    0  外部边    0  内聚比   0.0
+  [directory] scripts/playwright/query_param_models          文件    1  内部边    0  外部边    0  内聚比   0.0
+  [directory] scripts/playwright/request_form_models         文件    1  内部边    0  外部边    0  内聚比   0.0
+  [directory] scripts/tests/test_translation_fixer           文件    1  内部边    0  外部边    0  内聚比   0.0
+  [directory] scripts/tests/test_translation_fixer/test_code 文件    1  内部边    0  外部边    1  内聚比   0.0
+  [directory] scripts/tests/test_translation_fixer/test_comp 文件    1  内部边    0  外部边    1  内聚比   0.0
+  [directory] scripts/tests/test_translation_fixer/test_html 文件    1  内部边    0  外部边    1  内聚比   0.0
+  [directory] scripts/tests/test_translation_fixer/test_mark 文件    1  内部边    0  外部边    1  内聚比   0.0
+  [directory] tests/test_request_params                      文件    1  内部边    0  外部边    0  内聚比   0.0
+  [directory] tests/test_tutorial                            文件    1  内部边    0  外部边    0  内聚比   0.0
+
+中心度 top 12  ← 核对重点：这些是否是该项目的核心文件
+  0.13716  入度 580  fastapi/__init__.py
+  0.07254  入度 449  fastapi/testclient.py
+  0.03459  入度  40  fastapi/exceptions.py
+  0.02617  入度   4  fastapi/_compat/v2.py
+  0.02361  入度  23  fastapi/types.py
+  0.02327  入度  67  fastapi/responses.py
+  0.02198  入度   8  fastapi/datastructures.py
+  0.01712  入度 114  tests/utils.py
+  0.01696  入度  19  fastapi/routing.py
+  0.01542  入度  12  fastapi/_compat/__init__.py
+  0.01403  入度   5  fastapi/websockets.py
+  0.01376  入度   3  fastapi/param_functions.py
+
+入口点（20 个）  ← 核对重点：manifest 类是否命中真实入口
+  [manifest  ] fastapi/cli.py                               pyproject.toml [project.scripts] fastapi = fastapi.cli:main
+  [convention] docs_src/app_testing/app_a_py310/main.py     文件名约定：main.py
+  [convention] docs_src/app_testing/app_b_an_py310/main.py  文件名约定：main.py
+  [convention] docs_src/app_testing/app_b_py310/main.py     文件名约定：main.py
+  [convention] docs_src/async_tests/app_a_py310/main.py     文件名约定：main.py
+  [convention] docs_src/bigger_applications/app_an_py310/ma 文件名约定：main.py
+  [convention] docs_src/settings/app01_py310/main.py        文件名约定：main.py
+  [convention] docs_src/settings/app02_an_py310/main.py     文件名约定：main.py
+  [convention] docs_src/settings/app02_py310/main.py        文件名约定：main.py
+  [convention] docs_src/settings/app03_an_py310/main.py     文件名约定：main.py
+  [convention] docs_src/settings/app03_py310/main.py        文件名约定：main.py
+  [convention] fastapi/__main__.py                          文件名约定：__main__.py
+  [convention] fastapi/middleware/wsgi.py                   文件名约定：wsgi.py
+  [convention] tests/main.py                                文件名约定：main.py
+
+==============================================================================
+仓库 ghostfolio/ghostfolio
+==============================================================================
+准入通过：可解析 874 / 总 1578，体积 100448 KB
+克隆完成：HEAD 0b2bea001ea1，提交数 200
+语言构成（前 6）：{'TypeScript': 864, 'HTML': 153, 'Other': 140, 'CSS': 128, 'SQL': 122, 'Markdown': 94}
+
+解析：文件 1578，符号级解析 864，未解析 714，符号 2672
+  按 grammar：{'typescript': 864}
+
+依赖图：节点 864，边 3442，外部依赖 145，未解析 import 0，环 38，粒度 file
+
+循环依赖（共 38 个，最长 5 个节点）：
+  5 节点：libs/common/src/lib/interfaces/index.ts -> libs/common/src/lib/interfaces/responses/export-response.interface.ts -> libs/common/src/lib/interfaces/user-settings.interface.ts -> libs/common/src/lib/types/index.ts -> ...
+  4 节点：libs/common/src/lib/interfaces/activities.interface.ts -> libs/common/src/lib/types/index.ts -> libs/common/src/lib/types/impersonation-context.type.ts -> libs/common/src/lib/interfaces/index.ts
+  4 节点：libs/common/src/lib/interfaces/benchmark.interface.ts -> libs/common/src/lib/types/index.ts -> libs/common/src/lib/types/impersonation-context.type.ts -> libs/common/src/lib/interfaces/index.ts
+
+------------------------------------------------------------------------------
+模块聚类：264 个模块  ← 核对重点：分组是否吻合作者意图
+------------------------------------------------------------------------------
+  [directory] libs/common/src/lib/interfaces                 文件   51  内部边   75  外部边   52  内聚比   1.4
+  [directory] libs/common/src/lib/interfaces/responses       文件   41  内部边    1  外部边   36  内聚比   0.0
+  [directory] libs/common/src/lib/dtos                       文件   32  内部边   41  外部边   19  内聚比   2.2
+  [directory] libs/common/src/lib/types                      文件   31  内部边   33  外部边    6  内聚比   5.5
+  [merged   ] apps/api/src/app/{portfolio,redis-cache}       文件   26  内部边   43  外部边  257  内聚比   0.2
+  [directory] apps/api/src/app/portfolio                     文件   14  内部边   14  外部边  124  内聚比   0.1
+  [directory] apps/api/src/helper                            文件   12  内部边    1  外部边    6  内聚比   0.2
+  [directory] apps/api/src/app/auth                          文件    9  内部边   12  外部边   48  内聚比   0.2
+  [split    ] libs/common/src/lib#1                          文件    9  内部边    7  外部边    8  内聚比   0.9
+  [merged   ] apps/client/src/app/{components,services}      文件    8  内部边    5  外部边   17  内聚比   0.3
+  [merged   ] apps/api/src/services/{cron,property,queues}   文件    7  内部边   13  外部边   45  内聚比   0.3
+  [directory] apps/api/src/app/activities                    文件    6  内部边    7  外部边   67  内聚比   0.1
+  [directory] apps/api/src/app/endpoints/data-providers/ghos 文件    6  内部边    6  外部边   41  内聚比   0.1
+  [merged   ] apps/api/src/app/portfolio/calculator/{mwr,roi 文件    6  内部边    7  外部边   39  内聚比   0.2
+  [merged   ] apps/api/src/app/{account,account-balance}     文件    6  内部边   11  外部边   50  内聚比   0.2
+  [directory] apps/api/src/decorators                        文件    6  内部边    2  外部边   13  内聚比   0.2
+  [merged   ] apps/api/src/models/rules/regional-market-clus 文件    6  内部边    5  外部边   26  内聚比   0.2
+  [merged   ] apps/api/src/{app,services} [admin.controller. 文件    6  内部边    9  外部边   54  内聚比   0.2
+  [directory] apps/api/src/events                            文件    5  内部边    4  外部边   23  内聚比   0.2
+  [split    ] apps/api/src/guards#1                          文件    5  内部边    1  外部边    4  内聚比   0.2
+  [merged   ] apps/api/src/services/queues/portfolio-snapsho 文件    5  内部边    5  外部边   23  内聚比   0.2
+  [merged   ] apps/api/src/services/{cryptocurrency,data-pro 文件    5  内部边    6  外部边   15  内聚比   0.4
+  [merged   ] apps/api/src/{app,services} [user.controller.t 文件    5  内部边    7  外部边   60  内聚比   0.1
+  [directory] apps/client/src/app/core                       文件    5  内部边    0  外部边   15  内聚比   0.0
+  [merged   ] libs/ui/src/lib/assistant/{assistant-list-item 文件    5  内部边    7  外部边   10  内聚比   0.7
+  [directory] libs/ui/src/lib/fire-calculator                文件    5  内部边    5  外部边    7  内聚比   0.7
+  [directory] apps/api/src/app/endpoints/asset-profiles      文件    4  内部边    4  外部边   42  内聚比   0.1
+  [directory] apps/api/src/app/endpoints/benchmarks          文件    4  内部边    4  外部边   49  内聚比   0.1
+  [directory] apps/api/src/app/export                        文件    4  内部边    4  外部边   20  内聚比   0.2
+  [directory] apps/api/src/app/import                        文件    4  内部边    5  外部边   46  内聚比   0.1
+  [directory] apps/api/src/app/logo                          文件    4  内部边    4  外部边    9  内聚比   0.4
+  [split    ] apps/api/src/app/portfolio/interfaces#1        文件    4  内部边    1  外部边    2  内聚比   0.5
+  [merged   ] apps/api/src/guards#2+libs/common/src/lib#2    文件    4  内部边    4  外部边    8  内聚比   0.5
+  [directory] apps/api/src/middlewares                       文件    4  内部边    0  外部边   12  内聚比   0.0
+  [merged   ] apps/api/src/{app,interceptors}                文件    4  内部边    3  外部边   11  内聚比   0.3
+  [merged   ] apps/api/src/{app,services} [api-keys.controll 文件    4  内部边    4  外部边   10  内聚比   0.4
+  [merged   ] apps/api/src/{app,services} [market-data.contr 文件    4  内部边    4  外部边   20  内聚比   0.2
+  [merged   ] apps/api/src/{app,services} [tags.controller.t 文件    4  内部边    4  外部边   11  内聚比   0.4
+  [merged   ] apps/api/src/{interceptors,services}           文件    4  内部边    4  外部边    4  内聚比   1.0
+  [merged   ] apps/api/src/{models,services}                 文件    4  内部边    3  外部边    9  内聚比   0.3
+  [merged   ] apps/client/src/app/components/admin-market-da 文件    4  内部边    5  外部边   36  内聚比   0.1
+  [merged   ] apps/client/src/app/components/footer+apps/cli 文件    4  内部边    4  外部边   20  内聚比   0.2
+  [merged   ] apps/client/src/app/components/{access-table,u 文件    4  内部边    4  外部边   31  内聚比   0.1
+  [merged   ] apps/client/src/app/components/{admin-settings 文件    4  内部边    4  外部边   24  内聚比   0.2
+  [merged   ] apps/client/src/app/pages/accounts/{account-di 文件    4  内部边    4  外部边   24  内聚比   0.2
+  [merged   ] apps/client/src/app/pages/accounts/{transfer-b 文件    4  内部边    4  外部边   19  内聚比   0.2
+  [merged   ] apps/client/src/app/pages/register/{user-accou 文件    4  内部边    4  外部边   10  内聚比   0.4
+  [merged   ] libs/ui/src/lib/benchmark/{benchmark-detail-di 文件    4  内部边    4  外部边   16  内聚比   0.2
+  [directory] libs/ui/src/lib/entity-logo                    文件    4  内部边    4  外部边    2  内聚比   2.0
+  [merged   ] libs/ui/src/lib/notifications/{interfaces}     文件    4  内部边    5  外部边    8  内聚比   0.6
+  [directory] libs/ui/src/lib/portfolio-filter-form          文件    4  内部边    3  外部边   14  内聚比   0.2
+  [directory] apps/api/src/app/access                        文件    3  内部边    3  外部边   16  内聚比   0.2
+  [directory] apps/api/src/app/admin/queue                   文件    3  内部边    3  外部边   10  内聚比   0.3
+  [directory] apps/api/src/app/auth-device                   文件    3  内部边    3  外部边    7  内聚比   0.4
+  [directory] apps/api/src/app/endpoints/ai                  文件    3  内部边    3  外部边   37  内聚比   0.1
+  [directory] apps/api/src/app/endpoints/public              文件    3  内部边    3  外部边   34  内聚比   0.1
+  [directory] apps/api/src/app/endpoints/sitemap             文件    3  内部边    3  外部边   10  内聚比   0.3
+  [directory] apps/api/src/app/endpoints/watchlist           文件    3  内部边    3  外部边   27  内聚比   0.1
+  [directory] apps/api/src/app/exchange-rate                 文件    3  内部边    3  外部边    4  内聚比   0.8
+  [directory] apps/api/src/app/health                        文件    3  内部边    3  外部边   14  内聚比   0.2
+  [directory] apps/api/src/app/info                          文件    3  内部边    3  外部边   27  内聚比   0.1
+  [directory] apps/api/src/app/platform                      文件    3  内部边    3  外部边    7  内聚比   0.4
+  [directory] apps/api/src/app/subscription                  文件    3  内部边    3  外部边   18  内聚比   0.2
+  [directory] apps/api/src/app/symbol                        文件    3  内部边    3  外部边   17  内聚比   0.2
+  [directory] apps/api/src/interceptors/performance-logging  文件    3  内部边    3  外部边    0  内聚比   3.0
+  [merged   ] apps/api/src/models/{interfaces}               文件    3  内部边    3  外部边    4  内聚比   0.8
+  [split    ] apps/api/src/services/asset-profile-split#1    文件    3  内部边    2  外部边    5  内聚比   0.4
+  [directory] apps/api/src/services/benchmark                文件    3  内部边    2  外部边   16  内聚比   0.1
+  [merged   ] apps/api/src/services/data-provider/data-enhan 文件    3  内部边    2  外部边   10  内聚比   0.2
+  [merged   ] apps/api/src/services/data-provider/{coingecko 文件    3  内部边    2  外部边   39  内聚比   0.1
+  [merged   ] apps/api/src/services/data-provider/{data-enha 文件    3  内部边    1  外部边   10  内聚比   0.1
+  [merged   ] apps/api/src/services/data-provider/{errors,fi 文件    3  内部边    1  外部边   10  内聚比   0.1
+  [directory] apps/api/src/services/exchange-rate-data       文件    3  内部边    2  外部边   15  内聚比   0.1
+  [directory] apps/api/src/services/impersonation            文件    3  内部边    2  外部边   19  内聚比   0.1
+  [directory] apps/api/src/services/queues/statistics-gather 文件    3  内部边    2  外部边   11  内聚比   0.2
+  [merged   ] apps/api/src/services/{data-provider,fetch}    文件    3  内部边    2  外部边   13  内聚比   0.2
+  [merged   ] apps/api/src/{app,filters}                     文件    3  内部边    2  外部边    0  内聚比   2.0
+  [merged   ] apps/api/src/{environments,services}           文件    3  内部边    1  外部边    9  内聚比   0.1
+  [directory] apps/client/src                                文件    3  内部边    0  外部边   14  内聚比   0.0
+  [merged   ] apps/client/src/app/components/admin-platform/ 文件    3  内部边    3  外部边   12  内聚比   0.2
+  [merged   ] apps/client/src/app/components/home-watchlist/ 文件    3  内部边    3  外部边   12  内聚比   0.2
+  [merged   ] apps/client/src/app/components/rule/{rule-sett 文件    3  内部边    3  外部边    4  内聚比   0.8
+  [merged   ] apps/client/src/app/components/{account-detail 文件    3  内部边    2  外部边   23  内聚比   0.1
+  [merged   ] apps/client/src/app/components/{admin-users,us 文件    3  内部边    3  外部边   16  内聚比   0.2
+  [merged   ] apps/client/src/app/components/{header,login-w 文件    3  内部边    3  外部边   17  内聚比   0.2
+  [merged   ] apps/client/src/app/pages/portfolio/activities 文件    3  内部边    2  外部边   16  内聚比   0.1
+  [merged   ] apps/client/src/app/pages/portfolio/activities 文件    3  内部边    2  外部边   17  内聚比   0.1
+  [merged   ] apps/client/src/app/pages/portfolio/allocation 文件    3  内部边    2  外部边   18  内聚比   0.1
+  [merged   ] apps/client/src/app/pages/pricing+libs/ui/src/ 文件    3  内部边    2  外部边    9  内聚比   0.2
+  [directory] apps/client/src/app/pages/resources/personal-f 文件    3  内部边    1  外部边   11  内聚比   0.1
+  [directory] apps/client/src/app/services/user              文件    3  内部边    2  外部边    6  内聚比   0.3
+  [merged   ] apps/client/src/app/{components,pages} [admin- 文件    3  内部边    2  外部边   19  内聚比   0.1
+  [merged   ] apps/client/src/app/{components,pages} [benchm 文件    3  内部边    2  外部边   24  内聚比   0.1
+  [merged   ] apps/client/src/app/{components,pages} [home-h 文件    3  内部边    2  外部边   21  内聚比   0.1
+  [merged   ] apps/client/src/app/{components,pages} [market 文件    3  内部边    2  外部边   12  内聚比   0.2
+  [merged   ] apps/client/src/app/{components,pages} [rules. 文件    3  内部边    2  外部边   13  内聚比   0.2
+  [merged   ] apps/client/src/app/{components,pages} [user-a 文件    3  内部边    2  外部边   18  内聚比   0.1
+  [merged   ] apps/client/src/app/{directives,pages}         文件    3  内部边    2  外部边    9  内聚比   0.2
+  [directory] libs/common/src/lib/enums                      文件    3  内部边    2  外部边    0  内聚比   2.0
+  [directory] libs/common/src/lib/models                     文件    3  内部边    3  外部边    4  内聚比   0.8
+  [directory] libs/ui/src/lib/access-level-icon              文件    3  内部边    2  外部边    1  内聚比   2.0
+  [directory] libs/ui/src/lib/account-selector               文件    3  内部边    2  外部边    5  内聚比   0.4
+  [directory] libs/ui/src/lib/accounts-table                 文件    3  内部边    2  外部边   11  内聚比   0.2
+  [directory] libs/ui/src/lib/activities-table               文件    3  内部边    2  外部边   17  内聚比   0.1
+  [directory] libs/ui/src/lib/activity-type                  文件    3  内部边    2  外部边    1  内聚比   2.0
+  [directory] libs/ui/src/lib/carousel                       文件    3  内部边    1  外部边    0  内聚比   1.0
+  [directory] libs/ui/src/lib/chart                          文件    3  内部边    3  外部边    3  内聚比   1.0
+  [directory] libs/ui/src/lib/currency-selector              文件    3  内部边    2  外部边    2  内聚比   1.0
+  [directory] libs/ui/src/lib/environment                    文件    3  内部边    3  外部边    0  内聚比   3.0
+  [directory] libs/ui/src/lib/fear-and-greed-index           文件    3  内部边    2  外部边    2  内聚比   1.0
+  [directory] libs/ui/src/lib/historical-market-data-editor  文件    3  内部边    2  外部边    7  内聚比   0.3
+  [directory] libs/ui/src/lib/holdings-table                 文件    3  内部边    2  外部边    7  内聚比   0.3
+  [directory] libs/ui/src/lib/line-chart                     文件    3  内部边    2  外部边    6  内聚比   0.3
+  [directory] libs/ui/src/lib/logo                           文件    3  内部边    2  外部边    0  内聚比   2.0
+  [directory] libs/ui/src/lib/logo-carousel                  文件    3  内部边    2  外部边    1  内聚比   2.0
+  [directory] libs/ui/src/lib/membership-card                文件    3  内部边    2  外部边    3  内聚比   0.7
+  [directory] libs/ui/src/lib/mocks                          文件    3  内部边    0  外部边    2  内聚比   0.0
+  [directory] libs/ui/src/lib/no-activities-info             文件    3  内部边    2  外部边    3  内聚比   0.7
+  [merged   ] libs/ui/src/lib/page-tabs/{interfaces}         文件    3  内部边    3  外部边    0  内聚比   3.0
+  [directory] libs/ui/src/lib/portfolio-proportion-chart     文件    3  内部边    2  外部边    6  内聚比   0.3
+  [directory] libs/ui/src/lib/premium-indicator              文件    3  内部边    2  外部边    1  内聚比   2.0
+  [directory] libs/ui/src/lib/services                       文件    3  内部边    2  外部边   11  内聚比   0.2
+  [directory] libs/ui/src/lib/symbol-autocomplete            文件    3  内部边    2  外部边    7  内聚比   0.3
+  [directory] libs/ui/src/lib/tags-selector                  文件    3  内部边    2  外部边    1  内聚比   2.0
+  [directory] libs/ui/src/lib/toggle                         文件    3  内部边    2  外部边    1  内聚比   2.0
+  [directory] libs/ui/src/lib/treemap-chart                  文件    3  内部边    2  外部边    8  内聚比   0.2
+  [directory] libs/ui/src/lib/trend-indicator                文件    3  内部边    2  外部边    1  内聚比   2.0
+  [directory] libs/ui/src/lib/value                          文件    3  内部边    2  外部边    1  内聚比   2.0
+  [directory] libs/ui/src/lib/world-map-chart                文件    3  内部边    2  外部边    2  内聚比   1.0
+  [directory] apps/api/src                                   文件    2  内部边    0  外部边    7  内聚比   0.0
+  [directory] apps/api/src/app                               文件    2  内部边    1  外部边   51  内聚比   0.0
+  [directory] apps/api/src/app/cache                         文件    2  内部边    1  外部边    6  内聚比   0.2
+  [directory] apps/api/src/app/endpoints/assets              文件    2  内部边    1  外部边    3  内聚比   0.3
+  [directory] apps/api/src/app/endpoints/mcp                 文件    2  内部边    1  外部边   12  内聚比   0.1
+  [directory] apps/api/src/app/endpoints/platforms           文件    2  内部边    1  外部边    6  内聚比   0.2
+  [split    ] apps/api/src/app/portfolio/interfaces#2        文件    2  内部边    1  外部边    2  内聚比   0.5
+  [split    ] apps/api/src/app/portfolio/interfaces#3        文件    2  内部边    1  外部边    1  内聚比   1.0
+  [split    ] apps/api/src/app/portfolio/interfaces#4        文件    2  内部边    1  外部边    0  内聚比   1.0
+  [directory] apps/api/src/dtos                              文件    2  内部边    1  外部边    2  内聚比   0.5
+  [split    ] apps/api/src/guards#3                          文件    2  内部边    1  外部边    8  内聚比   0.1
+  [split    ] apps/api/src/guards#4                          文件    2  内部边    1  外部边    5  内聚比   0.2
+  [directory] apps/api/src/interceptors/redact-values-in-res 文件    2  内部边    0  外部边    5  内聚比   0.0
+  [directory] apps/api/src/models/rules/asset-class-cluster- 文件    2  内部边    0  外部边   10  内聚比   0.0
+  [directory] apps/api/src/models/rules/currency-cluster-ris 文件    2  内部边    0  外部边   10  内聚比   0.0
+  [directory] apps/api/src/models/rules/economic-market-clus 文件    2  内部边    0  外部边   10  内聚比   0.0
+  [directory] apps/api/src/models/rules/emergency-fund       文件    2  内部边    0  外部边   10  内聚比   0.0
+  [directory] apps/api/src/services/api                      文件    2  内部边    1  外部边    1  内聚比   1.0
+  [split    ] apps/api/src/services/asset-profile-split#2    文件    2  内部边    1  外部边    6  内聚比   0.2
+  [merged   ] apps/api/src/services/data-provider/alpha-vant 文件    2  内部边    1  外部边    5  内聚比   0.2
+  [directory] apps/api/src/services/demo                     文件    2  内部边    1  外部边    5  内聚比   0.2
+  [directory] apps/api/src/services/fetch/interfaces         文件    2  内部边    0  外部边    0  内聚比   0.0
+  [directory] apps/api/src/services/interfaces               文件    2  内部边    0  外部边    1  内聚比   0.0
+  [directory] apps/api/src/services/twitter-bot              文件    2  内部边    1  外部边   10  内聚比   0.1
+  [directory] apps/client/src/app/adapter                    文件    2  内部边    0  外部边    3  内聚比   0.0
+  [merged   ] apps/client/src/app/components/admin-market-da 文件    2  内部边    1  外部边    5  内聚比   0.2
+  [merged   ] apps/client/src/app/components/data-provider-s 文件    2  内部边    1  外部边    1  内聚比   1.0
+  [merged   ] apps/client/src/app/components/holding-detail- 文件    2  内部边    1  外部边   23  内聚比   0.0
+  [merged   ] apps/client/src/app/components/subscription-in 文件    2  内部边    1  外部边    4  内聚比   0.2
+  [merged   ] apps/client/src/app/components/{home-overview, 文件    2  内部边    1  外部边   14  内聚比   0.1
+  [merged   ] apps/client/src/app/components/{home-summary,p 文件    2  内部边    1  外部边   11  内聚比   0.1
+  [directory] apps/client/src/app/pages/about                文件    2  内部边    1  外部边    8  内聚比   0.1
+  [directory] apps/client/src/app/pages/about/changelog      文件    2  内部边    1  外部边    2  内聚比   0.5
+  [directory] apps/client/src/app/pages/about/license        文件    2  内部边    1  外部边    2  内聚比   0.5
+  [directory] apps/client/src/app/pages/about/oss-friends    文件    2  内部边    1  外部边    2  内聚比   0.5
+  [directory] apps/client/src/app/pages/about/overview       文件    2  内部边    1  外部边    6  内聚比   0.2
+  [directory] apps/client/src/app/pages/about/privacy-policy 文件    2  内部边    1  外部边    2  内聚比   0.5
+  [directory] apps/client/src/app/pages/about/terms-of-servi 文件    2  内部边    1  外部边    2  内聚比   0.5
+  [merged   ] apps/client/src/app/pages/api/{interfaces}     文件    2  内部边    1  外部边    4  内聚比   0.2
+  [directory] apps/client/src/app/pages/auth                 文件    2  内部边    1  外部边    3  内聚比   0.3
+  [directory] apps/client/src/app/pages/blog                 文件    2  内部边    1  外部边    4  内聚比   0.2
+  [directory] apps/client/src/app/pages/faq                  文件    2  内部边    1  外部边    6  内聚比   0.2
+  [directory] apps/client/src/app/pages/faq/overview         文件    2  内部边    1  外部边    5  内聚比   0.2
+  [directory] apps/client/src/app/pages/faq/saas             文件    2  内部边    1  外部边    6  内聚比   0.2
+  [directory] apps/client/src/app/pages/faq/self-hosting     文件    2  内部边    1  外部边    4  内聚比   0.2
+  [directory] apps/client/src/app/pages/landing              文件    2  内部边    1  外部边   11  内聚比   0.1
+  [directory] apps/client/src/app/pages/open                 文件    2  内部边    1  外部边    6  内聚比   0.2
+  [directory] apps/client/src/app/pages/portfolio            文件    2  内部边    1  外部边    6  内聚比   0.2
+  [merged   ] apps/client/src/app/pages/portfolio/activities 文件    2  内部边    1  外部边    9  内聚比   0.1
+  [directory] apps/client/src/app/pages/portfolio/fire       文件    2  内部边    1  外部边   11  内聚比   0.1
+  [directory] apps/client/src/app/pages/public               文件    2  内部边    1  外部边   13  内聚比   0.1
+  [directory] apps/client/src/app/pages/resources            文件    2  内部边    1  外部边    4  内聚比   0.2
+  [directory] apps/client/src/app/pages/resources/glossary   文件    2  内部边    1  外部边    5  内聚比   0.2
+  [directory] apps/client/src/app/pages/resources/guides     文件    2  内部边    1  外部边    1  内聚比   1.0
+  [directory] apps/client/src/app/pages/resources/markets    文件    2  内部边    1  外部边    1  内聚比   1.0
+  [directory] apps/client/src/app/pages/resources/overview   文件    2  内部边    1  外部边    1  内聚比   1.0
+  [directory] apps/client/src/app/pages/zen                  文件    2  内部边    1  外部边    8  内聚比   0.1
+  [directory] apps/client/src/environments                   文件    2  内部边    0  外部边    2  内聚比   0.0
+  [directory] libs/common/src/lib/routes/interfaces          文件    2  内部边    0  外部边    1  内聚比   0.0
+  [directory] libs/common/src/lib/utils                      文件    2  内部边    1  外部边    0  内聚比   1.0
+  [directory] libs/common/src/lib/validator-constraints      文件    2  内部边    0  外部边    1  内聚比   0.0
+  [directory] libs/ui/src/lib/account-balances               文件    2  内部边    1  外部边    7  内聚比   0.1
+  [directory] libs/ui/src/lib/activities-filter              文件    2  内部边    1  外部边    2  内聚比   0.5
+  [directory] libs/ui/src/lib/data-provider-credits          文件    2  内部边    1  外部边    1  内聚比   1.0
+  [directory] libs/ui/src/lib/dialog-footer                  文件    2  内部边    1  外部边    0  内聚比   1.0
+  [directory] libs/ui/src/lib/dialog-header                  文件    2  内部边    1  外部边    0  内聚比   1.0
+  [directory] libs/ui/src/lib/fab                            文件    2  内部边    1  外部边    0  内聚比   1.0
+  [merged   ] libs/ui/src/lib/historical-market-data-editor/ 文件    2  内部边    1  外部边    2  内聚比   0.5
+  [merged   ] libs/ui/src/lib/notifications/alert-dialog/{in 文件    2  内部边    1  外部边    0  内聚比   1.0
+  [merged   ] libs/ui/src/lib/notifications/confirmation-dia 文件    2  内部边    1  外部边    2  内聚比   0.5
+  [merged   ] libs/ui/src/lib/notifications/prompt-dialog/{i 文件    2  内部边    1  外部边    0  内聚比   1.0
+  [directory] libs/ui/src/lib/portfolio-filter-form/interfac 文件    2  内部边    1  外部边    1  内聚比   1.0
+  [directory] libs/ui/src/lib/top-holdings                   文件    2  内部边    1  外部边    3  内聚比   0.3
+  [directory] .config                                        文件    1  内部边    0  外部边    0  内聚比   0.0
+  [directory] <root>                                         文件    1  内部边    0  外部边    0  内聚比   0.0
+  [directory] apps/api                                       文件    1  内部边    0  外部边    0  内聚比   0.0
+  [directory] apps/api/src/app/account/interfaces            文件    1  内部边    0  外部边    1  内聚比   0.0
+  [directory] apps/api/src/app/admin/pipes                   文件    1  内部边    0  外部边    2  内聚比   0.0
+  [directory] apps/api/src/app/auth/interfaces               文件    1  内部边    0  外部边    1  内聚比   0.0
+  [directory] apps/api/src/app/import/interfaces             文件    1  内部边    0  外部边    0  内聚比   0.0
+  [directory] apps/api/src/models/rules/fees                 文件    1  内部边    0  外部边    5  内聚比   0.0
+  [directory] apps/api/src/models/rules/liquidity            文件    1  内部边    0  外部边    5  内聚比   0.0
+  [directory] apps/api/src/services/benchmark/interfaces     文件    1  内部边    0  外部边    1  内聚比   0.0
+  [directory] apps/api/src/services/data-provider/google-she 文件    1  内部边    0  外部边    6  内聚比   0.0
+  [directory] apps/api/src/services/data-provider/rapid-api  文件    1  内部边    0  外部边    6  内聚比   0.0
+  [directory] apps/api/src/services/data-provider/rapid-api/ 文件    1  内部边    0  外部边    0  内聚比   0.0
+  [directory] apps/api/src/services/exchange-rate-data/inter 文件    1  内部边    0  外部边    0  内聚比   0.0
+  [directory] apps/api/src/services/property/interfaces      文件    1  内部边    0  外部边    0  内聚比   0.0
+  [directory] apps/api/src/services/queues/statistics-gather 文件    1  内部边    0  外部边    0  内聚比   0.0
+  [directory] apps/client                                    文件    1  内部边    0  外部边    0  内聚比   0.0
+  [directory] apps/client/src/app/components/admin-overview  文件    1  内部边    0  外部边   10  内聚比   0.0
+  [directory] apps/client/src/app/interfaces                 文件    1  内部边    0  外部边    0  内聚比   0.0
+  [directory] apps/client/src/app/pages/blog/2021/07/hallo-g 文件    1  内部边    0  外部边    1  内聚比   0.0
+  [directory] apps/client/src/app/pages/blog/2021/07/hello-g 文件    1  内部边    0  外部边    1  内聚比   0.0
+  [directory] apps/client/src/app/pages/blog/2022/01/first-m 文件    1  内部边    0  外部边    1  内聚比   0.0
+  [directory] apps/client/src/app/pages/blog/2022/07/ghostfo 文件    1  内部边    0  外部边    1  内聚比   0.0
+  [directory] apps/client/src/app/pages/blog/2022/07/how-do- 文件    1  内部边    0  外部边    1  内聚比   0.0
+  [directory] apps/client/src/app/pages/blog/2022/08/500-sta 文件    1  内部边    0  外部边    1  内聚比   0.0
+  [directory] apps/client/src/app/pages/blog/2022/10/hacktob 文件    1  内部边    0  外部边    1  内聚比   0.0
+  [directory] apps/client/src/app/pages/blog/2022/11/black-f 文件    1  内部边    0  外部边    2  内聚比   0.0
+  [directory] apps/client/src/app/pages/blog/2022/12/the-imp 文件    1  内部边    0  外部边    1  内聚比   0.0
+  [directory] apps/client/src/app/pages/blog/2023/01/ghostfo 文件    1  内部边    0  外部边    1  内聚比   0.0
+  [directory] apps/client/src/app/pages/blog/2023/02/ghostfo 文件    1  内部边    0  外部边    1  内聚比   0.0
+  [directory] apps/client/src/app/pages/blog/2023/03/1000-st 文件    1  内部边    0  外部边    1  内聚比   0.0
+  [directory] apps/client/src/app/pages/blog/2023/05/unlock- 文件    1  内部边    0  外部边    1  内聚比   0.0
+  [directory] apps/client/src/app/pages/blog/2023/07/explori 文件    1  内部边    0  外部边    1  内聚比   0.0
+  [directory] apps/client/src/app/pages/blog/2023/08/ghostfo 文件    1  内部边    0  外部边    1  内聚比   0.0
+  [directory] apps/client/src/app/pages/blog/2023/09/ghostfo 文件    1  内部边    0  外部边    1  内聚比   0.0
+  [directory] apps/client/src/app/pages/blog/2023/09/hacktob 文件    1  内部边    0  外部边    1  内聚比   0.0
+  [directory] apps/client/src/app/pages/blog/2023/11/black-w 文件    1  内部边    0  外部边    2  内聚比   0.0
+  [directory] apps/client/src/app/pages/blog/2023/11/hacktob 文件    1  内部边    0  外部边    1  内聚比   0.0
+  [directory] apps/client/src/app/pages/blog/2024/09/hacktob 文件    1  内部边    0  外部边    1  内聚比   0.0
+  [directory] apps/client/src/app/pages/blog/2024/11/black-w 文件    1  内部边    0  外部边    2  内聚比   0.0
+  [directory] apps/client/src/app/pages/blog/2025/09/hacktob 文件    1  内部边    0  外部边    1  内聚比   0.0
+  [directory] apps/client/src/app/pages/blog/2025/11/black-w 文件    1  内部边    0  外部边    2  内聚比   0.0
+  [directory] apps/client/src/app/pages/blog/2026/04/ghostfo 文件    1  内部边    0  外部边    1  内聚比   0.0
+  [directory] apps/client/src/app/pages/demo                 文件    1  内部边    0  外部边    4  内聚比   0.0
+  [directory] apps/client/src/app/pages/features             文件    1  内部边    0  外部边    6  内聚比   0.0
+  [directory] apps/client/src/app/pages/i18n                 文件    1  内部边    0  外部边    0  内聚比   0.0
+  [directory] apps/client/src/app/pages/resources/personal-f 文件    1  内部边    0  外部边    1  内聚比   0.0
+  [directory] apps/client/src/app/pages/webauthn             文件    1  内部边    0  外部边    2  内聚比   0.0
+  [directory] apps/client/src/app/services/ics               文件    1  内部边    0  外部边    2  内聚比   0.0
+  [directory] apps/client/src/app/util                       文件    1  内部边    0  外部边    0  内聚比   0.0
+  [directory] libs/common                                    文件    1  内部边    0  外部边    0  内聚比   0.0
+  [directory] libs/common/src                                文件    1  内部边    0  外部边    0  内聚比   0.0
+  [directory] libs/common/src/lib/validators                 文件    1  内部边    0  外部边    1  内聚比   0.0
+  [directory] libs/ui                                        文件    1  内部边    0  外部边    0  内聚比   0.0
+  [directory] libs/ui/src                                    文件    1  内部边    0  外部边    0  内聚比   0.0
+  [directory] libs/ui/src/lib/logo-carousel/interfaces       文件    1  内部边    0  外部边    0  内聚比   0.0
+  [directory] libs/ui/src/lib/portfolio-proportion-chart/int 文件    1  内部边    0  外部边    1  内聚比   0.0
+  [directory] libs/ui/src/lib/shared                         文件    1  内部边    0  外部边    0  内聚比   0.0
+  [directory] libs/ui/src/lib/tags-selector/interfaces       文件    1  内部边    0  外部边    0  内聚比   0.0
+  [directory] libs/ui/src/lib/treemap-chart/interfaces       文件    1  内部边    0  外部边    1  内聚比   0.0
+  [directory] prisma                                         文件    1  内部边    0  外部边    0  内聚比   0.0
+  [directory] tools                                          文件    1  内部边    0  外部边    0  内聚比   0.0
+
+中心度 top 12  ← 核对重点：这些是否是该项目的核心文件
+  0.08029  入度 127  libs/common/src/lib/types/index.ts
+  0.07140  入度 267  libs/common/src/lib/interfaces/index.ts
+  0.03569  入度 147  libs/common/src/lib/config.ts
+  0.01955  入度  99  libs/common/src/lib/routes/routes.ts
+  0.01885  入度 135  libs/common/src/lib/helper.ts
+  0.01019  入度  76  libs/common/src/lib/permissions.ts
+  0.00978  入度  33  apps/api/src/services/prisma/prisma.service.ts
+  0.00948  入度  80  apps/api/src/services/configuration/configuration.service.ts
+  0.00632  入度  33  libs/common/src/lib/enums/index.ts
+  0.00535  入度  46  libs/common/src/lib/dtos/index.ts
+  0.00511  入度   2  libs/common/src/lib/types/account-with-platform.type.ts
+  0.00511  入度   2  libs/common/src/lib/types/account-with-balance.type.ts
+
+入口点（7 个）  ← 核对重点：manifest 类是否命中真实入口
+  [manifest  ] apps/client/src/main.ts                      apps/client/project.json targets.build.options.main = apps/c
+  [convention] apps/api/src/main.ts                         文件名约定：main.ts
+  [graph_root] apps/api/src/app/portfolio/calculator/roai/p 图上零入度，出度 14
+  [graph_root] apps/api/src/app/portfolio/calculator/roai/p 图上零入度，出度 14
+  [graph_root] apps/api/src/app/portfolio/calculator/roai/p 图上零入度，出度 19
+  [graph_root] apps/api/src/app/portfolio/calculator/roai/p 图上零入度，出度 14
+  [graph_root] apps/api/src/app/portfolio/portfolio.service 图上零入度，出度 16

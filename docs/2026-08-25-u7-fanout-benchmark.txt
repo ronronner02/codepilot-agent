@@ -1,0 +1,334 @@
+端点拒绝 response_format（BadRequestError），去掉该参数重试
+
+==============================================================================
+仓库 fastapi__fastapi
+==============================================================================
+
+扇出 3 个模块（实跑限量）
+
+------------------------------------------------------------------------------
+模块 fastapi#1（deep）
+------------------------------------------------------------------------------
+  轮次 3，工具调用 12 次
+    read_file:{"end_line": 80, "path": "fastapi/__init__.py", "start_line": 1}
+    read_file:{"end_line": 120, "path": "fastapi/applications.py", "start_line": 1}
+    read_file:{"end_line": 80, "path": "fastapi/routing.py", "start_line": 1}
+    read_file:{"end_line": 80, "path": "fastapi/params.py", "start_line": 1}
+    read_file:{"end_line": 350, "path": "fastapi/applications.py", "start_line": 200}
+    read_file:{"end_line": 200, "path": "fastapi/routing.py", "start_line": 80}
+    read_file:{"end_line": 200, "path": "fastapi/exceptions.py", "start_line": 1}
+    read_file:{"end_line": 120, "path": "fastapi/exception_handlers.py", "start_line": 1}
+    read_file:{"end_line": 600, "path": "fastapi/applications.py", "start_line": 350}
+    read_file:{"end_line": 450, "path": "fastapi/routing.py", "start_line": 200}
+    read_file:{"end_line": 256, "path": "fastapi/exceptions.py", "start_line": 200}
+    read_file:{"end_line": 300, "path": "fastapi/params.py", "start_line": 80}
+  限制：工具输出累积达 60633 字符（上限 60000），已收敛并基于已读内容产出分析
+  引用路径 7 个，其中不存在的 0 个
+
+  分析正文：
+基于对核心文件的分析，以下是 `fastapi` 模块的架构说明：
+### 1. 模块职责
+本模块是 FastAPI 框架的核心包，负责提供 Web 应用的入口、路由分发、请求/响应封装以及依赖注入的基础抽象。
+- **应用入口与配置**：`fastapi/applications.py` 中的 `FastAPI` 类继承自 `Starlette`，承担应用初始化、OpenAPI 文档路由挂载（`/docs`, `/redoc`）、异常处理器注册及中间件栈构建等职责。
+- **公开 API 导出**：`fastapi/__init__.py` 集中导出了框架对外的核心符号，包括 `FastAPI`、`APIRouter`、`HTTPException`、参数函数（`Path`, `Query`, `Body` 等）、以及 `Request`/`Response`/`WebSocket` 封装。
+- **参数定义与校验**：`fastapi/params.py` 负责将路径参数、查询参数、请求体等抽象为 Pydantic 兼容的 `FieldInfo`，并附加 OpenAPI 元数据。
+- **路由与执行流**：`fastapi/routing.py` 负责将装饰器注册的端点函数转化为 ASGI 应用，并在请求处理过程中集成依赖注入、异步上下文管理和响应序列化。
+### 2. 内部组织与关键文件关系
+- **`fastapi/applications.py`**：
+  - `FastAPI.__init__` 方法通过 `Annotated[..., Doc(...)]` 语法绑定了大量配置项（如 `openapi_url`, `docs_url`, `default_response_class`），这种写法既服务于类型检查，也用于自动生成文档。
+  - 在初始化时，它会引入 `fastapi/exception_handlers.py` 中的默认异常处理器（如 `request_validation_exception_handler`），并将它们与 Starlette 的异常处理机制对接。
+- **`fastapi/routing.py`**（核心枢纽）：
+  - **ASGI 封装**：定义了 `request_response` 和 `websocket_session`，它们是对 Starlette 同名函数的改造版。为了支持 FastAPI 特有的依赖注入清理逻辑，这两个函数内部嵌套了 `AsyncExitStack`，并将其挂载到 ASGI 的 `scope` 字典中（键为 `fastapi_inner_astack` 和 `fastapi_function_astack`）。
+  - **请求执行器**：`get_request_handler` 充当端点函数的代理，负责协调 `fastapi/dependencies/utils.py` 解析出的依赖项、执行端点函数，并调用 `serialize_response` 完成响应序列化。
+  - **上下文溯源**：模块维护了一个 `_endpoint_context_cache` 字典，通过 `_extract_endpoint_context` 函数利用 `inspect` 模块提取
+
+------------------------------------------------------------------------------
+模块 tests（standard）
+------------------------------------------------------------------------------
+  轮次 8，工具调用 31 次
+    list_structure:{"path": "tests"}
+    read_file:{"end_line": 60, "path": "tests/__init__.py", "start_line": 1}
+    read_file:{"end_line": 80, "path": "tests/main.py", "start_line": 1}
+    read_file:{"end_line": 208, "path": "tests/main.py", "start_line": 80}
+    read_file:{"end_line": 60, "path": "tests/test_application.py", "start_line": 1}
+    read_file:{"end_line": 50, "path": "tests/test_additional_properties.py", "start_line": 1}
+    read_file:{"end_line": 80, "path": "tests/test_dependency_overrides.py", "start_line": 1}
+    read_file:{"end_line": 100, "path": "tests/test_dependency_contextvars.py", "start_line": 1}
+    read_file:{"end_line": 80, "path": "tests/test_compat.py", "start_line": 1}
+    read_file:{"end_line": 40, "path": "tests/forward_reference_type.py", "start_line": 1}
+    read_file:{"end_line": 80, "path": "tests/test_dependency_class.py", "start_line": 1}
+    read_file:{"end_line": 120, "path": "tests/test_dependency_class.py", "start_line": 80}
+    read_file:{"end_line": 60, "path": "tests/test_custom_middleware_exception.py", "start_line": 1}
+    read_file:{"end_line": 60, "path": "tests/test_annotated.py", "start_line": 1}
+    read_file:{"end_line": 140, "path": "tests/test_compat.py", "start_line": 80}
+    read_file:{"end_line": 80, "path": "tests/test_datastructures.py", "start_line": 1}
+    read_file:{"end_line": 80, "path": "tests/test_dependency_contextmanager.py", "start_line": 1}
+    read_file:{"end_line": 60, "path": "tests/test_custom_route_class.py", "start_line": 1}
+    read_file:{"end_line": 100, "path": "tests/test_dependency_overrides.py", "start_line": 80}
+    read_file:{"end_line": 60, "path": "tests/test_dependency_cache.py", "start_line": 1}
+    read_file:{"end_line": 80, "path": "tests/test_dependency_after_yield_raise.py", "start_line": 1}
+    read_file:{"end_line": 80, "path": "tests/test_callable_endpoint.py", "start_line": 1}
+    read_file:{"end_line": 60, "path": "tests/test_default_response_class.py", "start_line": 1}
+    read_file:{"end_line": 60, "path": "tests/utils.py", "start_line": 1}
+    read_file:{"end_line": 60, "path": "tests/test_dependency_duplicates.py", "start_line": 1}
+    read_file:{"end_line": 80, "path": "tests/test_dependency_models.py", "start_line": 1}
+    read_file:{"end_line": 60, "path": "tests/test_custom_schema_fields.py", "start_line": 1}
+    read_file:{"end_line": 60, "path": "tests/test_dependencies_utils.py", "start_line": 1}
+    read_file:{"end_line": 60, "path": "tests/test_datetime_custom_encoder.py", "start_line": 1}
+    read_file:{"end_line": 60, "path": "tests/test_allow_inf_nan_in_enforcing.py", "start_line": 1}
+    read_file:{"end_line": 60, "path": "tests/test_ambiguous_params.py", "start_line": 1}
+  限制：达到 ReAct 轮次上限 8，基于已获取的信息产出分析
+  引用路径 17 个，其中不存在的 0 个
+
+  分析正文：
+# `tests` 模块架构说明
+## 1. 模块承担的职责
+`tests` 模块承担的是 FastAPI 核心功能的端到端验证和回归测试职责。它通过构建 `FastAPI` 应用实例，注册路由，并使用 `TestClient` 发起 HTTP 请求来验证框架的预期行为，包括参数解析、依赖注入、OpenAPI Schema 生成、兼容性处理等。
+- 该职责体现于绝大多数 `test_*.py` 文件（如 `tests/test_additional_properties.py`, `tests/test_dependency_overrides.py`）中均独立创建 `app = FastAPI()` 并使用 `client = TestClient(app)` 发起请求的行为。
+- 它也覆盖了内部辅助函数的单元测试，如 `tests/test_compat.py` 直接导入 `fastapi._compat` 内部方法测试类型注解兼容，`tests/test_dependency_models.py` 导入 `fastapi.dependencies.models` 测试可调用对象分类缓存。
+## 2. 内部怎么组织的
+模块采用**扁平化文件组织**，没有按功能划分子目录，所有测试文件都直接放在 `tests/` 下。内部结构主要由三类文件构成：
+- **基础辅助文件**：
+  - `tests/__init__.py`：空文件，仅用于将目录标记为 Python 包。
+  - `tests/main.py`：定义了一个包含大量覆盖参数类型和校验规则（如 `Path`, `Query` 的 `gt`, `lt`, `min_length` 等）路由的 `FastAPI` 实例，供 `tests/test_application.py` 等测试复用，用于验证基础的路径查询解析和 OpenAPI Schema。
+  - `tests/forward_reference_type.py`：定义了 `ForwardRefModel` 和 `forwardref_method`，专门用于提供前向引用测试场景。
+  - `tests/utils.py`：定义了跨测试文件使用的装饰器标记（如 `needs_py310`, `needs_py314`, `needs_orjson`, `needs_ujson`, `workdir_lock`）和模块级跳过函数 `skip_module_if_py_gte_314`。
+- **端到端特性测试文件 (`test_*.py`)**：
+  - 绝大多数文件采用自包含模式：在文件内部实例化 `FastAPI()`，定义特定特性的路由，实例化 `TestClient`，并编写 `test_*` 函数验证 HTTP 响应和状态码。
+  - 文件按被测特性命名，如 `test_additional_responses_*.py` 集中测试 OpenAPI responses 字段定制，`test_dependency_*.py` 集中测试依赖注入的不同特性。
+- **内部逻辑白盒测试文件**：
+LLM 调用失败（第 1/4 次）InternalServerError，2.7s 后重试
+LLM 调用失败（第 2/4 次）InternalServerError，3.3s 后重试
+LLM 调用失败（第 3/4 次）InternalServerError，6.4s 后重试
+端点拒绝 response_format（BadRequestError），去掉该参数重试
+Planner 调用失败 InternalServerError: Error code: 502 - {'type': 'https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-5xx-errors/error-502/', 'title': 'Error 502: Bad gateway', 'status': 502, 'detail': 'The origin web server returned an invalid or incomplete response to Cloudflare. This typically indicates the origin is overloaded or misconfigured.', 'instance': 'a307a4e27a4e9236', 'error_code': 502, 'error_name': 'origin_bad_gateway', 'error_category': 'origin', 'ray_id': 'a307a4e27a4e9236', 'timestamp': '2026-08-25T03:52:29Z', 'zone': 'api.futureppo.top', 'cloudflare_error': True, 'retryable': True, 'retry_after': 60, 'owner_action_required': True, 'what_you_should_do': '**Wait and retry.** Back off for at least 60 seconds. If the error persists, the website operator should check their origin server health and configuration.', 'footer': 'This error was generated by Cloudflare on behalf of the website owner.'}
+LLM 调用失败（第 1/4 次）InternalServerError，1.8s 后重试
+  - 部分文件深入被测模块内部，针对特定内部类和函数进行测试。如 `tests/test_dependency_models.py` 直
+
+------------------------------------------------------------------------------
+模块 fastapi/_compat（standard）
+------------------------------------------------------------------------------
+  轮次 5，工具调用 8 次
+    read_file:{"end_line": 60, "path": "fastapi/_compat/__init__.py", "start_line": 1}
+    read_file:{"end_line": 80, "path": "fastapi/_compat/shared.py", "start_line": 1}
+    read_file:{"end_line": 60, "path": "fastapi/_compat/v2.py", "start_line": 1}
+    read_file:{"end_line": 160, "path": "fastapi/_compat/v2.py", "start_line": 60}
+    read_file:{"end_line": 180, "path": "fastapi/_compat/shared.py", "start_line": 80}
+    read_file:{"end_line": 222, "path": "fastapi/_compat/shared.py", "start_line": 180}
+    read_file:{"end_line": 300, "path": "fastapi/_compat/v2.py", "start_line": 160}
+    read_file:{"end_line": 493, "path": "fastapi/_compat/v2.py", "start_line": 300}
+  引用路径 0 个，其中不存在的 0 个
+
+  分析正文：
+## `fastapi/_compat` 模块架构说明
+### 1. 职责
+这个模块是 FastAPI 针对 **Pydantic v2** 的适配/兼容层。尽管目录名为 `_compat`（且历史上有 v1/v2 双版本适配的痕迹），从代码来看它已**完全基于 Pydantic v2 实现**，不再包含 v1 实现分支——仅保留了少量检测 v1 模型实例的函数。核心职责有两块：
+- **类型注解分析**：判断一个注解是标量、序列、复杂类型还是 bytes/UploadFile 等，供 FastAPI 路由解析层决定参数如何提取和校验。
+- **字段抽象与 Schema 生成**：以 `ModelField` 为核心，封装 Pydantic v2 的 `FieldInfo`/`TypeAdapter`，提供统一的字段校验、序列化和 JSON Schema 生成接口，屏蔽 Pydantic v2 内部 API 变化对 FastAPI 其余部分的影响。
+### 2. 内部组织
+**`__init__.py`（40 行）**——纯 re-export 聚合层。将 `shared.py` 和 `v2.py` 的公开符号统一从 `fastapi._compat` 包级导出，不包含任何逻辑。外部调用方只需 `from fastapi._compat import ModelField` 即可拿到所需符号。
+**`shared.py`（222 行）**——版本无关的注解分类工具集。不依赖 Pydantic 内部私有 API，只从 `pydantic` 公开接口和 `pydantic.version` 导入。
+- `PYDANTIC_VERSION_MINOR_TUPLE`（第 31 行）：从 `pydantic.version.VERSION` 解析出 `(major, minor)` 元组，供 v2.py 做版本条件分支。
+- `lenient_issubclass`（第 47 行）：安全 `issubclass`，对非类型参数返回 `False` 而非抛异常，注释标注 "Copy from Pydantic"。
+- `field_annotation_is_sequence` / `field_annotation_is_scalar` / `field_annotation_is_complex`（第 64/108/92 行）：三类注解分类函数，统一处理 `Annotated` 解包和 `Union`/`UnionType` 递归展开。
+- `is_bytes_or_nonable_bytes_annotation` / `is_uploadfile_or_nonable_uploadfile_annotation` 及对应的 `*_sequence_annotation` 变体（第 134–183 行）：针对 `bytes` 和 Starlette `UploadFile` 的特化判断，用于请求体解析时区分文件上传与普通字段。
+- `is_pydantic_v1_model_instance` / `is_pydantic_v1_model_class` / `annotation_is_pydantic_v1`（第 186–222 行）：通过尝试 `fr
+
+==============================================================================
+仓库 ghostfolio__ghostfolio
+==============================================================================
+
+扇出 3 个模块（实跑限量）
+
+------------------------------------------------------------------------------
+模块 libs/common/src/lib/interfaces（deep）
+------------------------------------------------------------------------------
+  轮次 8，工具调用 44 次
+    list_structure:{"path": "libs/common/src/lib/interfaces"}
+    read_file:{"end_line": 200, "path": "libs/common/src/lib/interfaces/index.ts", "start_line": 1}
+    read_file:{"end_line": 120, "path": "libs/common/src/lib/interfaces/activities.interface.ts", "start_line": 1}
+    read_file:{"end_line": 120, "path": "libs/common/src/lib/interfaces/portfolio-details.interface.ts", "start_li
+    read_file:{"end_line": 120, "path": "libs/common/src/lib/interfaces/portfolio-position.interface.ts", "start_l
+    read_file:{"end_line": 120, "path": "libs/common/src/lib/interfaces/holding.interface.ts", "start_line": 1}
+    read_file:{"end_line": 120, "path": "libs/common/src/lib/interfaces/user.interface.ts", "start_line": 1}
+    read_file:{"end_line": 120, "path": "libs/common/src/lib/interfaces/user-settings.interface.ts", "start_line":
+    read_file:{"end_line": 100, "path": "libs/common/src/lib/interfaces/enhanced-asset-profile.interface.ts", "sta
+    read_file:{"end_line": 60, "path": "libs/common/src/lib/interfaces/benchmark.interface.ts", "start_line": 1}
+    read_file:{"end_line": 80, "path": "libs/common/src/lib/interfaces/portfolio-performance.interface.ts", "start
+    read_file:{"end_line": 80, "path": "libs/common/src/lib/interfaces/portfolio-summary.interface.ts", "start_lin
+    read_file:{"end_line": 60, "path": "libs/common/src/lib/interfaces/filter.interface.ts", "start_line": 1}
+    read_file:{"end_line": 60, "path": "libs/common/src/lib/interfaces/filter-group.interface.ts", "start_line": 1
+    read_file:{"end_line": 80, "path": "libs/common/src/lib/interfaces/access.interface.ts", "start_line": 1}
+    read_file:{"end_line": 60, "path": "libs/common/src/lib/interfaces/access-settings.interface.ts", "start_line"
+    read_file:{"end_line": 60, "path": "libs/common/src/lib/interfaces/system-message.interface.ts", "start_line":
+    read_file:{"end_line": 60, "path": "libs/common/src/lib/interfaces/symbol-metrics.interface.ts", "start_line":
+    read_file:{"end_line": 80, "path": "libs/common/src/lib/interfaces/x-ray-rules-settings.interface.ts", "start_
+    read_file:{"end_line": 60, "path": "libs/common/src/lib/interfaces/rule-settings.interface.ts", "start_line": 
+    read_file:{"end_line": 80, "path": "libs/common/src/lib/interfaces/fire-wealth.interface.ts", "start_line": 1}
+    read_file:{"end_line": 80, "path": "libs/common/src/lib/interfaces/fire-calculation-complete-event.interface.t
+    read_file:{"end_line": 80, "path": "libs/common/src/lib/interfaces/portfolio-chart.interface.ts", "start_line"
+    read_file:{"end_line": 60, "path": "libs/common/src/lib/interfaces/data-provider-info.interface.ts", "start_li
+    read_file:{"end_line": 60, "path": "libs/common/src/lib/interfaces/scraper-configuration.interface.ts", "start
+    read_file:{"end_line": 60, "path": "libs/common/src/lib/interfaces/subscription-offer.interface.ts", "start_li
+    read_file:{"end_line": 80, "path": "libs/common/src/lib/interfaces/responses/data-provider-response.interface.
+    read_file:{"end_line": 80, "path": "libs/common/src/lib/interfaces/responses/portfolio-performance-response.in
+    read_file:{"end_line": 80, "path": "libs/common/src/lib/interfaces/responses/portfolio-holding-response.interf
+    read_file:{"end_line": 80, "path": "libs/common/src/lib/interfaces/responses/info-response.interface.ts", "sta
+    read_file:{"end_line": 40, "path": "libs/common/src/lib/interfaces/responses/errors.interface.ts", "start_line
+    read_file:{"end_line": 80, "path": "libs/common/src/lib/interfaces/responses/activities-response.interface.ts"
+    read_file:{"end_line": 80, "path": "libs/common/src/lib/interfaces/responses/portfolio-holdings-response.inter
+    read_file:{"end_line": 40, "path": "libs/common/src/lib/interfaces/responses/access-token-response.interface.t
+    read_file:{"end_line": 60, "path": "libs/common/src/lib/interfaces/info-item.interface.ts", "start_line": 1}
+    read_file:{"end_line": 60, "path": "libs/common/src/lib/interfaces/admin-data.interface.ts", "start_line": 1}
+    read_file:{"end_line": 60, "path": "libs/common/src/lib/interfaces/admin-jobs.interface.ts", "start_line": 1}
+    read_file:{"end_line": 60, "path": "libs/common/src/lib/interfaces/historical-data-item.interface.ts", "start_
+    read_file:{"end_line": 60, "path": "libs/common/src/lib/interfaces/line-chart-item.interface.ts", "start_line"
+    read_file:{"end_line": 60, "path": "libs/common/src/lib/interfaces/lookup-item.interface.ts", "start_line": 1}
+    read_file:{"end_line": 60, "path": "libs/common/src/lib/interfaces/market-data.interface.ts", "start_line": 1}
+    read_file:{"end_line": 60, "path": "libs/common/src/lib/interfaces/portfolio-report-rule.interface.ts", "start
+    read_file:{"end_line": 60, "path": "libs/common/src/lib/interfaces/holding-with-parents.interface.ts", "start_
+    read_file:{"end_line": 60, "path": "libs/common/src/lib/interfaces/country.interface.ts", "start_line": 1}
+  限制：达到 ReAct 轮次上限 8，基于已获取的信息产出分析
+  引用路径 0 个，其中不存在的 0 个
+
+  分析正文：
+# `libs/common/src/lib/interfaces` 模块架构说明
+## 1. 模块职责
+这是 Ghostfolio monorepo（API 后端 + Angular 前端）共享的**领域类型契约中心**。`index.ts` 通过 `import type` + 单一 `export` 块（第 102–198 行）把本目录 51 个文件里的全部接口聚合到一个出口，对外作为 `@ghostfolio/common/interfaces` 被引用。证据集中在两点：
+- **所有文件都是纯 `export interface` / `export type`，零运行时逻辑**（除 `SymbolMetrics` 在 `symbol-metrics.interface.ts` 引入 `big.js` 的 `Big` 类型、`admin-jobs.interface.ts` 引入 `bull` 的 `Job`/`JobStatus` 类型、`subscription-offer.interface.ts` 引入 `ms` 的 `StringValue` 类型外，没有其他运行时依赖）。
+- **接口命名覆盖业务核心名词**：`Activity`（activities.interface.ts）、`PortfolioPosition`/`PortfolioDetails`/`PortfolioSummary`/`PortfolioPerformance`（portfolio-*.interface.ts）、`Holding`（holding.interface.ts）、`EnhancedAssetProfile`（enhanced-asset-profile.interface.ts）、`User`/`UserSettings`（user*.interface.ts）、`Benchmark`（benchmark.interface.ts）、`Access`/`AccessSettings`（access*.interface.ts）。这些是前后端在 API 边界和数据计算管道上必须对齐的契约。
+## 2. 内部组织
+### 2.1 两层目录：实体契约 + 响应契约
+顶层放领域实体的"应用层形状"，`responses/` 子目录放 HTTP/服务调用的返回形状。两者命名一一对应：
+| 实体（顶层） | 响应包装（`responses/`） |
+|---|---|
+| `Activity`/`ActivityError`（activities.interface.ts:6,20） | `ActivitiesResponse`（activities-response.interface.ts:3）、`ActivityResponse` |
+| `PortfolioPerformance`（portfolio-performance.interface.ts:1） | `PortfolioPerformanceResponse extends ResponseError`（responses/portfolio-performance-response.interface.ts:5） |
+| `PortfolioPosition`（portfolio
+
+------------------------------------------------------------------------------
+模块 libs/common/src/lib/types（deep）
+------------------------------------------------------------------------------
+  轮次 8，工具调用 37 次
+    read_file:{"path": "libs/common/src/lib/types/index.ts"}
+    list_structure:{"path": "libs/common/src/lib/types"}
+    read_file:{"path": "libs/common/src/lib/types/date-range.type.ts"}
+    read_file:{"path": "libs/common/src/lib/types/impersonation-context.type.ts"}
+    read_file:{"path": "libs/common/src/lib/types/user-with-settings.type.ts"}
+    read_file:{"path": "libs/common/src/lib/types/property-key.type.ts"}
+    read_file:{"path": "libs/common/src/lib/types/sector-name.type.ts"}
+    read_file:{"path": "libs/common/src/lib/types/request-with-user.type.ts"}
+    read_file:{"path": "libs/common/src/lib/types/access-level.type.ts"}
+    read_file:{"path": "libs/common/src/lib/types/access-with-grantee-user.type.ts"}
+    read_file:{"path": "libs/common/src/lib/types/market.type.ts"}
+    read_file:{"path": "libs/common/src/lib/types/market-state.type.ts"}
+    read_file:{"path": "libs/common/src/lib/types/market-advanced.type.ts"}
+    read_file:{"path": "libs/common/src/lib/types/market-data-preset.type.ts"}
+    read_file:{"path": "libs/common/src/lib/types/granularity.type.ts"}
+    read_file:{"path": "libs/common/src/lib/types/group-by.type.ts"}
+    read_file:{"path": "libs/common/src/lib/types/account-with-balance.type.ts"}
+    read_file:{"path": "libs/common/src/lib/types/account-with-platform.type.ts"}
+    read_file:{"path": "libs/common/src/lib/types/account-with-value.type.ts"}
+    read_file:{"path": "libs/common/src/lib/types/order-with-account.type.ts"}
+    read_file:{"path": "libs/common/src/lib/types/product-category.type.ts"}
+    read_file:{"path": "libs/common/src/lib/types/product-platform.type.ts"}
+    read_file:{"path": "libs/common/src/lib/types/benchmark-trend.type.ts"}
+    read_file:{"path": "libs/common/src/lib/types/fear-and-greed-index.type.ts"}
+    read_file:{"path": "libs/common/src/lib/types/ai-prompt-mode.type.ts"}
+    read_file:{"path": "libs/common/src/lib/types/color-scheme.type.ts"}
+    read_file:{"path": "libs/common/src/lib/types/holding-type.type.ts"}
+    read_file:{"path": "libs/common/src/lib/types/holdings-view-mode.type.ts"}
+    read_file:{"path": "libs/common/src/lib/types/performance-calculation-type.type.ts"}
+    read_file:{"path": "libs/common/src/lib/types/subscription-offer-key.type.ts"}
+    read_file:{"path": "libs/common/src/lib/types/toggle-option.type.ts"}
+    read_file:{"path": "libs/common/src/lib/types/view-mode.type.ts"}
+    read_file:{"end_line": 60, "path": "libs/common/src/lib/config.ts", "start_line": 1}
+    read_file:{"end_line": 30, "path": "libs/common/src/lib/interfaces/index.ts", "start_line": 1}
+    find_definition:{"name": "DATE_RANGES"}
+    find_definition:{"name": "SECTORS"}
+    read_file:{"end_line": 160, "path": "libs/common/src/lib/config.ts", "start_line": 60}
+  限制：达到 ReAct 轮次上限 8，基于已获取的信息产出分析
+  引用路径 1 个，其中不存在的 0 个
+
+  分析正文：
+# `libs/common/src/lib/types` 模块架构说明
+## 1. 模块职责
+这个模块是 ghostfolio 的**跨端共享类型契约层**，以「一文件一类型 + 桶导出」的形态集中沉淀前端、后端、Prisma 视图、UI 状态等领域类型，供 `@ghostfolio/common/types` 路径在前后端各处复用。
+依据：
+- `libs/common/src/lib/types/index.ts` 第 31–61 行统一 `export type { ... }` 全部 30 个类型，构成对外唯一入口。
+- 31 个成员文件几乎都只声明一个同名符号（见各文件符号名单），命名严格遵循 `xxx.type.ts`，确认这是「类型仓库」而非逻辑实现。
+- 内容形态覆盖三类：联合字面量类型（UI 状态/枚举式）、Prisma 实体扩展类型、业务组合类型。
+## 2. 内部组织
+### 2.1 桶式入口
+`libs/common/src/lib/types/index.ts` 以 `import type` 收齐 30 个子文件再 `export type` 重导出。所有外部消费都走该桶（例如 `request-with-user.type.ts` 第 1–4 行通过 `@ghostfolio/common/types` 引入 `ImpersonationContext`、`UserWithSettings`，`impersonation-context.type.ts` 第 2 行同样从这里导入 `UserWithSettings`）。
+### 2.2 文件分类与各自职责
+**A. 联合字面量（枚举式）类型** —— 集中表示受限的 UI/业务状态：
+- `access-level.type.ts`：`AccessLevel = 'CREATE_READ_UPDATE_DELETE' | 'READ' | 'READ_RESTRICTED'`，权限粒度。
+- `market.type.ts` / `market-advanced.type.ts` / `market-state.type.ts`：市场分类与开市状态。
+- `color-scheme.type.ts`、`view-mode.type.ts`、`holdings-view-mode.type.ts`、`ai-prompt-mode.type.ts`：纯 UI 模式开关。
+- `granularity.type.ts`、`group-by.type.ts`、`holding-type.type.ts`、`benchmark-trend.type.ts`、`fear-and-greed-index.type.ts`、`market-data-preset.type.ts`：聚合/趋势相关受限取值。
+- `product-category.type.ts`、`product-platform.type.ts`、`subscription-offer-key.type.ts`：产品与订阅维度的固定枚举。
+**B. Prisma 实体扩展类型** —— 在 ORM 实体上附加业务/视图字段：
+- `account-with-balance.type.ts`：`AccountMode
+
+------------------------------------------------------------------------------
+模块 libs/common/src/lib/interfaces/responses（deep）
+------------------------------------------------------------------------------
+  轮次 8，工具调用 45 次
+    list_structure:{"path": "libs/common/src/lib/interfaces/responses"}
+    read_file:{"end_line": 30, "path": "libs/common/src/lib/interfaces/responses/access-token-response.interface.t
+    read_file:{"end_line": 30, "path": "libs/common/src/lib/interfaces/responses/account-response.interface.ts", "
+    read_file:{"end_line": 30, "path": "libs/common/src/lib/interfaces/responses/accounts-response.interface.ts", 
+    read_file:{"end_line": 30, "path": "libs/common/src/lib/interfaces/responses/activities-response.interface.ts"
+    read_file:{"end_line": 30, "path": "libs/common/src/lib/interfaces/responses/activity-response.interface.ts", 
+    read_file:{"end_line": 30, "path": "libs/common/src/lib/interfaces/responses/admin-user-response.interface.ts"
+    read_file:{"end_line": 30, "path": "libs/common/src/lib/interfaces/responses/admin-users-response.interface.ts
+    read_file:{"end_line": 30, "path": "libs/common/src/lib/interfaces/responses/ai-prompt-response.interface.ts",
+    read_file:{"end_line": 30, "path": "libs/common/src/lib/interfaces/responses/ai-service-health-response.interf
+    read_file:{"end_line": 30, "path": "libs/common/src/lib/interfaces/responses/api-key-response.interface.ts", "
+    read_file:{"end_line": 40, "path": "libs/common/src/lib/interfaces/responses/asset-profile-response.interface.
+    read_file:{"end_line": 30, "path": "libs/common/src/lib/interfaces/responses/asset-profiles-response.interface
+    read_file:{"end_line": 30, "path": "libs/common/src/lib/interfaces/responses/asset-response.interface.ts", "st
+    read_file:{"end_line": 30, "path": "libs/common/src/lib/interfaces/responses/benchmark-market-data-details-res
+    read_file:{"end_line": 30, "path": "libs/common/src/lib/interfaces/responses/benchmark-response.interface.ts",
+    read_file:{"end_line": 30, "path": "libs/common/src/lib/interfaces/responses/create-stripe-checkout-session-re
+    read_file:{"end_line": 30, "path": "libs/common/src/lib/interfaces/responses/data-enhancer-health-response.int
+    read_file:{"end_line": 40, "path": "libs/common/src/lib/interfaces/responses/data-provider-ghostfolio-asset-pr
+    read_file:{"end_line": 40, "path": "libs/common/src/lib/interfaces/responses/data-provider-ghostfolio-status-r
+    read_file:{"end_line": 40, "path": "libs/common/src/lib/interfaces/responses/data-provider-health-response.int
+    read_file:{"end_line": 40, "path": "libs/common/src/lib/interfaces/responses/data-provider-response.interface.
+    read_file:{"end_line": 30, "path": "libs/common/src/lib/interfaces/responses/dividends-response.interface.ts",
+    read_file:{"end_line": 40, "path": "libs/common/src/lib/interfaces/responses/errors.interface.ts", "start_line
+    read_file:{"end_line": 40, "path": "libs/common/src/lib/interfaces/responses/export-response.interface.ts", "s
+    read_file:{"end_line": 30, "path": "libs/common/src/lib/interfaces/responses/historical-response.interface.ts"
+    read_file:{"end_line": 40, "path": "libs/common/src/lib/interfaces/responses/import-response.interface.ts", "s
+    read_file:{"end_line": 60, "path": "libs/common/src/lib/interfaces/responses/info-response.interface.ts", "sta
+    read_file:{"end_line": 30, "path": "libs/common/src/lib/interfaces/responses/lookup-response.interface.ts", "s
+    read_file:{"end_line": 30, "path": "libs/common/src/lib/interfaces/responses/market-data-of-markets-response.i
+    read_file:{"end_line": 46, "path": "libs/common/src/lib/interfaces/responses/export-response.interface.ts", "s
+    read_file:{"end_line": 30, "path": "libs/common/src/lib/interfaces/responses/oauth-response.interface.ts", "st
+    read_file:{"end_line": 30, "path": "libs/common/src/lib/interfaces/responses/platforms-response.interface.ts",
+    read_file:{"end_line": 60, "path": "libs/common/src/lib/interfaces/responses/portfolio-dividends-response.inte
+    read_file:{"end_line": 60, "path": "libs/common/src/lib/interfaces/responses/portfolio-holding-response.interf
+    read_file:{"end_line": 60, "path": "libs/common/src/lib/interfaces/responses/portfolio-holdings-response.inter
+    read_file:{"end_line": 60, "path": "libs/common/src/lib/interfaces/responses/portfolio-investments.interface.t
+    read_file:{"end_line": 60, "path": "libs/common/src/lib/interfaces/responses/portfolio-performance-response.in
+    read_file:{"end_line": 60, "path": "libs/common/src/lib/interfaces/responses/portfolio-report.interface.ts", "
+    read_file:{"end_line": 60, "path": "libs/common/src/lib/interfaces/responses/public-portfolio-response.interfa
+    read_file:{"end_line": 30, "path": "libs/common/src/lib/interfaces/responses/quotes-response.interface.ts", "s
+    read_file:{"end_line": 30, "path": "libs/common/src/lib/interfaces/responses/account-balances-response.interfa
+    find_definition:{"name": "PortfolioPerformanceResponse"}
+    find_definition:{"name": "ResponseError"}
+    find_references:{"name": "ExportResponse"}
+  限制：达到 ReAct 轮次上限 8，基于已获取的信息产出分析
+  引用路径 0 个，其中不存在的 0 个
+
+  分析正文：
+# libs/common/src/lib/interfaces/responses 架构说明
+## 1. 模块职责
+本目录是一个**纯接口聚合层**，集中定义面向 API 的响应结构。所有 41 个文件均只含 `export interface` 声明，无运行时代码。命名高度规整：除 `errors.interface.ts`、`portfolio-investments.interface.ts` 外，均以 `XxxResponse` 命名并对应一个业务响应场景。
+各文件按用途可分三类：
+- **单实体响应**：直接继承或包装一个领域实体。例如 `account-response.interface.ts` 第 3 行 `export interface AccountResponse extends AccountWithValue {}`、`activity-response.interface.ts` 第 3 行 `export interface ActivityResponse extends Activity {}`、`admin-user-response.interface.ts` 第 3 行 `export interface AdminUserResponse extends AdminUser {}`、`asset-response.interface.ts` 第 3 行 `export interface AssetResponse extends AdminMarketDataDetails {}`、`info-response.interface.ts` 第 3 行 `export interface InfoResponse extends InfoItem {}`。这类接口用于"一个对象回前端"的接口，通常没有额外字段。
+- **列表响应**：包裹一个数组并附上聚合统计。例如 `accounts-response.interface.ts` 第 3-10 行同时声明了 `accounts`、`activitiesCount`、`totalBalanceInBaseCurrency`、`totalDividendInBaseCurrency`、`totalInterestInBaseCurrency`、`totalValueInBaseCurrency`；`admin-users-response.interface.ts` 第 3-6 行 `{ count; users }`；`asset-profiles-response.interface.ts` 第 3-6 行 `{ assetProfiles; count }`；`activities-response.interface.ts` 第 3-6 行 `{ activities; count }`。命名和字段形态高度统一，体现分页/统计型响应的约定。
+- **特殊/复合响应**：有具体语义形状，无法用单一实体继承表达。例如 `export-response.interface.ts` 第 8-46 行声明一个完整导出包（accounts/activities/assetProfiles/platforms/tags/user，且用 `Omit<…, 'crea
+DONE exit=0

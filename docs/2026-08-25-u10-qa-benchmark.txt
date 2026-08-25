@@ -1,0 +1,122 @@
+
+==============================================================================
+仓库 fastapi__fastapi
+==============================================================================
+索引：719 块，命中=False，embedding 调用 12 次
+
+------------------------------------------------------------------------------
+问：FastAPI 应用是怎么生成 OpenAPI schema 的
+  预期找到 / 实际找到 -> 符合预期
+  LLM 调用 1 次，检索 12 片段，最近距离 0.1508
+
+  答：基于fastapi/applications.py:1070-1103 可以说明 FastAPI 生成 OpenAPI schema 的机制：
+
+1. **入口方法**：`FastAPI.openapi()` 方法负责生成 OpenAPI schema，FastAPI 内部会调用此方法（fastapi/applications.py:1070-1103）。
+
+2. **缓存机制**：该方法会先检查 `self.openapi_schema` 是否已存在，以及路由版本 `self._openapi_routes_version` 是否与当前 `self.router._get_routes_version()` 一致。如果 schema 已生成且路由版本未变化，直接返回缓存的 `self.openapi_schema`，避免重复生成的开销（fastapi/applications.py:1070-1103）。
+
+3. **实际生成**：如果 schema 不存在或路由版本变化，则调用 `get_openapi()` 函数生成新的 schema，传入的参数包括：
+   - `title`、`version`、`openapi_version`、`summary`、`description`
+   - `terms_of_service`、`contact`、`license_info`
+   - `routes`（应用的路由列表）、`webhooks`（webhook 路由）
+   - `tags`（`openapi_tags`）、`servers`
+   - `separate_input_output_schemas`
+   - `external_docs`（`openapi_external_docs`）
+   
+   生成后将结果存入 `self.openapi_schema`，并更新 `self._openapi_routes_version` 为当前路由版本（fastapi/applications.py:1070-1103）。
+
+4. **可扩展性**：文档
+
+  引用（核对这些路径行号是否真实存在）：
+    ✓ [片段 1] fastapi/applications.py:1070-1103（FastAPI.openapi）  距离 0.1508  文件存在，共 4774 行
+    ✓ [片段 2] tests/test_arbitrary_types.py:92-135（test_openapi_schema）  距离 0.2558  文件存在，共 135 行
+
+------------------------------------------------------------------------------
+问：Depends 这个函数是做什么的
+  预期找到 / 实际未找到 -> ★ 与预期不符
+  LLM 调用 0 次，检索 0 片段，最近距离 None
+
+  答：问题向量化失败（BadRequestError: Error code: 400 - {'error': {'code': 'ase_embedding_req_failed', 'message': 'ase_embedding_req_failed', 'param': '', 'type': 'upstream_error'}}），无法检索。
+  备注：embedding_failed
+
+------------------------------------------------------------------------------
+问：参数校验的元数据是怎么定义的
+  预期找到 / 实际找到 -> 符合预期
+  LLM 调用 1 次，检索 12 片段，最近距离 0.4301
+
+  答：根据现有片段，参数校验的元数据是通过 `Header`（fastapi/param_functions.py:813-932）中一系列 `Annotated[...]` 字段配合 `Doc(...)` 说明来定义的，包括：
+
+- `le`：数值必须小于等于该值
+- `min_length` / `max_length`：字符串的最小/最大长度
+- `pattern`：字符串校验的正则表达式（`regex` 已废弃，改用 `pattern`）
+- `discriminator`：用于区分 tagged union 类型的字段名
+- `strict`：是否启用严格校验
+- `multiple_of`：数值必须是该值的倍数
+- `allow_inf_nan`：是否允许 `inf`、`-inf`、`nan`
+- `max_digits` / `decimal_places`：decimal 类型的最大位数/小数位数
+- `examples` / `example`（已废弃）/ `openapi_examples`：用于声明示例值，会体现在生成的 OpenAPI 文档中
+
+这些元数据项都以 `Annotated[类型, Doc("说明")] = 默认值` 的形式定义在fastapi/param_functions.py:813-932 所示的函数参数签名中，用来描述每个校验参数的类型、含义及默认值。
+
+其余片段（LabelSettings、JsonApiError、test_openapi_schema 等）与参数校验元数据定义无直接关联，未涉及该问题的具体内容。
+
+  引用（核对这些路径行号是否真实存在）：
+    ✓ [片段 3] fastapi/param_functions.py:813-932（Header）  距离 0.4463  文件存在，共 2460 行
+
+------------------------------------------------------------------------------
+问：这个项目怎么连接 MongoDB 分片集群
+  预期未找到 / 实际未找到 -> 符合预期
+  LLM 调用 0 次，检索 12 片段，最近距离 0.4814
+
+  答：未在该仓库中找到与问题相关的代码。最接近的片段距离 0.481，超过相关性阈值 0.45。
+  备注：below_threshold
+
+==============================================================================
+仓库 ghostfolio__ghostfolio
+==============================================================================
+索引：190 块，命中=False，embedding 调用 3 次
+
+------------------------------------------------------------------------------
+问：FIRE 计算器是怎么算投影金额的
+  预期找到 / 实际找到 -> 符合预期
+  LLM 调用 1 次，检索 12 片段，最近距离 0.2281
+
+  答：FIRE 计算器对「投影金额（projectedTotalAmount）」的计算逻辑在 `getProjectedTotalAmount`（libs/ui/src/lib/fire-calculator/fire-calculator.component.ts:509-527）中：
+
+1. **优先使用用户手动输入的值**：先从表单 `calculatorForm` 里取 `projectedTotalAmount` 字段的值，如果用户已经填写了这个值，直接返回该值，不再计算。
+
+2. **否则通过复利公式计算**：调用 `fireCalculatorService.calculateCompoundInterest()`，传入四个参数：
+   - `P`：本金，来自 `getP()`（libs/ui/src/lib/fire-calculator/fire-calculator.component.ts:470-472），即当前的 `fireWealth`（没有则为 0）；
+   - `periodInMonths`：距离退休的月数 `periodsToRetire`；
+   - `PMT`：每期投入金额，来自 `getPMT()`（libs/ui/src/lib/fire-calculator/fire-calculator.component.ts:505-507），取表单里的 `paymentPerPeriod`（无则为 0）；
+   - `r`：年利率，来自 `getR()`（libs/ui/src/lib/fire-calculator/fire-calculator.component.ts:529-531），取表单 `annualInterestRate` 值除以 100（无则为 0）。
+
+   计算结果中的 `totalAmount` 调用 `.toNumber()` 转成普通数字后返回，作为投影总金额。
+
+其中 `periodsToRetire`（月数）由 `getPeriodsToRetire`（libs/ui/src/lib/fire-calcu
+
+  引用（核对这些路径行号是否真实存在）：
+    ✓ [片段 1] libs/ui/src/lib/fire-calculator/fire-calculator.component.ts:509-527（GfFireCalculatorComponent.getProjectedTotalAmount）  距离 0.2281  文件存在，共 548 行
+    ✓ [片段 2] libs/ui/src/lib/fire-calculator/fire-calculator.component.ts:470-472（GfFireCalculatorComponent.getP）  距离 0.2898  文件存在，共 548 行
+    ✓ [片段 4] libs/ui/src/lib/fire-calculator/fire-calculator.component.ts:474-503（GfFireCalculatorComponent.getPeriodsToRetire）  距离 0.3239  文件存在，共 548 行
+    ✓ [片段 5] libs/ui/src/lib/fire-calculator/fire-calculator.component.ts:529-531（GfFireCalculatorComponent.getR）  距离 0.3541  文件存在，共 548 行
+    ✓ [片段 6] libs/ui/src/lib/fire-calculator/fire-calculator.component.ts:505-507（GfFireCalculatorComponent.getPMT）  距离 0.3586  文件存在，共 548 行
+
+------------------------------------------------------------------------------
+问：账户选择组件初始化时做了什么
+  预期找到 / 实际找到 -> 符合预期
+  LLM 调用 1 次，检索 12 片段，最近距离 0.3952
+
+  答：账户选择组件（GfAccountSelectorComponent）在 ngOnInit 中只做了一件事：检查其关联的 ngControl 是否设置了 `Validators.required` 校验器，并将结果写入 `isRequired` 这个 signal（若没有 ngControl 或未设置该校验器，则默认为 `false`）（见libs/ui/src/lib/account-selector/account-selector.component.ts:94-98）。
+
+  引用（核对这些路径行号是否真实存在）：
+    ✓ [片段 1] libs/ui/src/lib/account-selector/account-selector.component.ts:94-98（GfAccountSelectorComponent.ngOnInit）  距离 0.3952  文件存在，共 132 行
+
+------------------------------------------------------------------------------
+问：这个项目怎么做区块链智能合约部署
+  预期未找到 / 实际未找到 -> 符合预期
+  LLM 调用 0 次，检索 12 片段，最近距离 0.5456
+
+  答：未在该仓库中找到与问题相关的代码。最接近的片段距离 0.546，超过相关性阈值 0.45。
+  备注：below_threshold
+DONE exit=0

@@ -1,0 +1,51 @@
+# 一条命令启动后端与前端：docker compose up
+#
+# MCP server 不在这里（KTD7）。它走 stdio 传输，由客户端（Claude Code、Cursor）自己拉起
+# 子进程——放进容器反而要额外造一条传输通道。本地启动方式见 backend/mcp_server/README.md。
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    # API key 经环境变量注入，不入镜像（安全面的明确要求）。
+    #
+    # env_file 在容器启动时读取宿主的 .env，不参与构建，所以密钥不会留在任何镜像层里。
+    # .dockerignore 另外排除了 .env，双重保证——只靠一处的话，日后有人改 Dockerfile
+    # 加一句 COPY . . 就会把密钥打进镜像。
+    env_file:
+      - .env
+    environment:
+      # 覆盖 .env 里可能存在的相对路径：容器内的工作区必须是卷挂载点。
+      WORKSPACE_ROOT: /data
+      # 允许前端容器的源。前端经 nginx 同源反代访问 /api，正常不触发 CORS；
+      # 这里留着是为了宿主直连 8000 调试时也能用。
+      CORS_ORIGINS: '["http://localhost","http://localhost:5173","http://127.0.0.1:5173"]'
+    volumes:
+      # 卷挂载点与 U9 的缓存落盘路径一致（WORKSPACE_ROOT 派生 repos_dir 与 index_dir）。
+      # 不一致会让容器重启后缓存失效，每次重新付 embedding 成本。
+      - codepilot-data:/data
+    ports:
+      # **只绑 127.0.0.1。** 后端没有鉴权层（Implementation Scope Boundaries 的有意决定），
+      # 而它能克隆任意仓库并消耗 LLM 额度。绑 0.0.0.0 等于把这个能力开放给同网段的任何人。
+      - "127.0.0.1:8000:8000"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    depends_on:
+      backend:
+        # 等后端健康而非仅启动：nginx 启动时若后端未就绪，首个 /api 请求会 502，
+        # 而用户看到的是「无法连接后端」——一个由启动顺序制造的假故障。
+        condition: service_healthy
+    ports:
+      # 同样只绑本地：界面能提交分析，等价于能触发克隆与 LLM 调用。
+      - "127.0.0.1:80:80"
+    restart: unless-stopped
+
+volumes:
+  # 具名卷而非绑定挂载：绑定挂载在 Windows/macOS 上的文件 IO 明显更慢，而这里存的是
+  # Chroma 的 sqlite 与克隆的仓库，两者都是 IO 密集的。
+  codepilot-data:

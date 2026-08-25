@@ -1,0 +1,92 @@
+# Spec-First -- local project config
+# Copy to .spec-first/config.local.yaml in your project root.
+# All settings are optional. This file is a local-only override, not a
+# team-shared source of truth. Invalid values are ignored or fall back per
+# setting.
+
+# --- Local execution overrides ---
+# Current supported consumer: src/verification/profile-loader.js reads this
+# key as a local execution preference. Keep it commented until you have created
+# the referenced profile in your own checkout.
+
+# verification_profile_path: .spec-first/verification-profile.local.json
+
+# --- Feedback sweep ---
+# Active consumer: spec-sweep reads these keys. The first interactive
+# spec-sweep setup writes them after the user approves source-side behavior.
+# Do not prefill secrets or source bodies here.
+
+# feedback_sources:
+#   - id: gh-issues
+#     type: github-issues
+#     target: owner/repo
+#     ack_action: label:triaged
+#     closeout_action: comment
+#     sensitive: false
+#     approved: false
+# sweep_state_path: docs/feedback-sweep/state.yml
+# sweep_ack_cap: 25
+# sweep_lease_ttl_minutes: 60
+# sweep_shared_branch: false
+
+# --- Product pulse ---
+# Active consumer: spec-product-pulse reads these keys. Its first-run
+# interview writes the pulse_* block and keeps data-source access read-only.
+
+# pulse_product_name: "Product name"
+# pulse_lookback_default: 24h
+# pulse_primary_event: "primary_event"
+# pulse_value_event: "value_event"
+# pulse_completion_events: "event_a,event_b"
+# pulse_quality_scoring: false
+# pulse_quality_dimension: "helpfulness"
+# pulse_analytics_source: posthog
+# pulse_tracing_source: sentry
+# pulse_payments_source: stripe
+# pulse_db_enabled: false
+# pulse_metric_sources: "retention_d7=posthog,nps=delighted"
+# pulse_pending_metrics: "metric_without_data"
+# pulse_excluded_metrics: "metric_outside_pulse"
+# pulse_schedule: manual  # daily | weekly | manual | ask-again-after-3-runs
+
+# --- Promotion helpers ---
+# Active consumer: spec-promote reads an uncommented top-level
+# spec_promote_spiral_optout: true to avoid re-offering optional Spiral setup
+# in this project. Keep it commented unless the user declined that enhancement.
+
+# spec_promote_spiral_optout: true
+
+# --- Document rendering ---
+# 以下三项分别由 spec-plan、spec-brainstorm 和 spec-ideate 读取；只接受未注释的
+# md 或 html。保持示例为注释状态，继续使用各 workflow 的默认值，Runtime Setup
+# 不会调用这些 workflow，也不会改变 consumer 自己的 pipeline override。
+
+# plan_output: html       # active: md | html (spec-plan 默认 md)
+# brainstorm_output: html # active: md | html (spec-brainstorm 默认 md)
+# ideate_output: html     # active: md | html (spec-ideate 默认 html)
+
+# --- Work delegation ---
+# Integrated local config surface for downstream execution workflows that
+# choose to support delegated work. These keys are inert during setup: setup
+# exposes and protects them, but never auto-delegates or changes host runtime
+# behavior by itself.
+
+# work_delegate: codex
+# work_delegate_consent: true
+# work_delegate_sandbox: yolo
+# work_delegate_decision: auto
+# work_delegate_model: gpt-5.4
+# work_delegate_effort: high
+
+# --- Planning confirmation ---
+# Integrated local config surface for downstream planning workflows that choose
+# to support a persisted scoping-confirmation preference. Setup never uses this
+# key to skip questions by itself.
+
+# plan_skip_scoping_confirm: true
+
+# --- Project workflow conventions ---
+# Do not store team-shared tracker policy, label vocabulary, external PR
+# request-surface policy, issue acceptance rules, or rejected-scope decisions in
+# this local file. Put durable team conventions in source-tracked project docs
+# with explicit downstream consumers and tests.

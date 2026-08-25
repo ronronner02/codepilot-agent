@@ -1,0 +1,294 @@
+端点拒绝 response_format（BadRequestError），去掉该参数重试
+端点拒绝 response_format（BadRequestError），去掉该参数重试
+端点拒绝 response_format（BadRequestError），去掉该参数重试
+端点拒绝 response_format（BadRequestError），去掉该参数重试
+
+==============================================================================
+仓库 fastapi__fastapi
+==============================================================================
+
+挑选依据：从 1138 个文件中按「中心度 60% + 提交触碰频次 40%」取前 8 个
+  churn  19  fastapi/__init__.py
+  churn   1  fastapi/testclient.py
+  churn  11  fastapi/routing.py
+  churn   1  fastapi/exceptions.py
+  churn   6  fastapi/dependencies/utils.py
+  churn   1  fastapi/_compat/v2.py
+  churn   1  fastapi/types.py
+  churn   3  fastapi/applications.py
+
+------------------------------------------------------------------------------
+各类执行情况（R17：零命中与未执行须可区分）
+------------------------------------------------------------------------------
+  structural：命中 6 条（范围：1138 个文件、203 个模块；检查项：循环依赖、层级违规、超大模块（>40 文件）。另有 958 个文件无仓库内导入方（多为测试、配置与工具链入口，其调用方在仓库之外），因误报率过高未逐条列出；符号级死代码需调用点分析，当前解析层不支持）
+  error_handling：已检查，命中 0 条（范围：8 个待检文件；检查项：裸 except、异常被吞、IO 缺错误处理、资源未关闭；模型判定 3 个候选不必报告）
+  security：已检查，命中 0 条（范围：8 个待检文件；模式集：硬编码密钥（文本层，6 个模式：aws_access_key_id, github_token, openai_key, slack_token, private_key_block, assigned_credential）；SQL 字符串拼接（执行方法：execute, executemany, executescript, query, raw）；命令拼接（shell 调用与 subprocess shell=True）；不安全反序列化（cPickle, dill, marshal, pickle, shelve、yaml.load、eval/exec）；模型判定 1 个候选不必报告）
+
+------------------------------------------------------------------------------
+发现明细（共 6 条）
+------------------------------------------------------------------------------
+
+  [high  ] circular_dependency  fastapi/__init__.py:0
+    结论：4 个文件构成循环依赖
+    依据：依赖图上的有向环：fastapi/__init__.py -> fastapi/applications.py -> fastapi/exception_handlers.py -> fastapi/utils.py -> fastapi/__init__.py
+
+  [high  ] circular_dependency  fastapi/__init__.py:0
+    结论：4 个文件构成循环依赖
+    依据：依赖图上的有向环：fastapi/__init__.py -> fastapi/routing.py -> fastapi/dependencies/utils.py -> fastapi/utils.py -> fastapi/__init__.py
+
+  [medium] circular_dependency  fastapi/__init__.py:0
+    结论：3 个文件构成循环依赖
+    依据：依赖图上的有向环：fastapi/__init__.py -> fastapi/routing.py -> fastapi/utils.py -> fastapi/__init__.py
+
+  [medium] circular_dependency  fastapi/_compat/__init__.py:0
+    结论：3 个文件构成循环依赖
+    依据：依赖图上的有向环：fastapi/_compat/__init__.py -> fastapi/_compat/v2.py -> fastapi/params.py -> fastapi/_compat/__init__.py
+
+  [medium] circular_dependency  fastapi/_compat/v2.py:0
+    结论：3 个文件构成循环依赖
+    依据：依赖图上的有向环：fastapi/_compat/v2.py -> fastapi/params.py -> fastapi/datastructures.py -> fastapi/_compat/v2.py
+
+  [low   ] oversized_module  tests/__init__.py:0
+    结论：模块 tests 含 213 个文件，超出 40
+    依据：模块内部边 13、外部边 497；分组来历 directory
+
+==============================================================================
+仓库 ghostfolio__ghostfolio
+==============================================================================
+
+挑选依据：从 864 个文件中按「中心度 60% + 提交触碰频次 40%」取前 8 个
+  churn   6  libs/common/src/lib/types/index.ts
+  churn  13  libs/common/src/lib/config.ts
+  churn   2  libs/common/src/lib/interfaces/index.ts
+  churn  15  libs/common/src/lib/helper.ts
+  churn  14  apps/api/src/app/user/user.service.ts
+  churn  13  apps/api/src/app/portfolio/portfolio.service.ts
+  churn  13  apps/api/src/app/import/import.service.ts
+  churn  11  apps/api/src/app/portfolio/portfolio.service.spec.ts
+
+------------------------------------------------------------------------------
+各类执行情况（R17：零命中与未执行须可区分）
+------------------------------------------------------------------------------
+  structural：命中 49 条（范围：864 个文件、264 个模块；检查项：循环依赖、层级违规、超大模块（>40 文件）。另有 146 个文件无仓库内导入方（多为测试、配置与工具链入口，其调用方在仓库之外），因误报率过高未逐条列出；符号级死代码需调用点分析，当前解析层不支持）
+  error_handling：命中 5 条（范围：8 个待检文件；检查项：裸 except、异常被吞、IO 缺错误处理、资源未关闭）
+  security：已检查，命中 0 条（范围：8 个待检文件；模式集：硬编码密钥（文本层，6 个模式：aws_access_key_id, github_token, openai_key, slack_token, private_key_block, assigned_credential）；SQL 字符串拼接（执行方法：execute, executemany, executescript, query, raw）；命令拼接（shell 调用与 subprocess shell=True）；不安全反序列化（cPickle, dill, marshal, pickle, shelve、yaml.load、eval/exec）；模型判定 1 个候选不必报告）
+
+------------------------------------------------------------------------------
+发现明细（共 54 条）
+------------------------------------------------------------------------------
+
+  [medium] circular_dependency  apps/api/src/decorators/requires-scope.decorator.ts:0
+    结论：2 个文件构成循环依赖
+    依据：依赖图上的有向环：apps/api/src/decorators/requires-scope.decorator.ts -> apps/api/src/guards/scope.guard.ts -> apps/api/src/decorators/requires-scope.decorator.ts
+
+  [medium] circular_dependency  libs/common/src/lib/config.ts:0
+    结论：3 个文件构成循环依赖
+    依据：依赖图上的有向环：libs/common/src/lib/config.ts -> libs/common/src/lib/types/index.ts -> libs/common/src/lib/types/date-range.type.ts -> libs/common/src/lib/config.ts
+
+  [medium] circular_dependency  libs/common/src/lib/dtos/index.ts:0
+    结论：2 个文件构成循环依赖
+    依据：依赖图上的有向环：libs/common/src/lib/dtos/index.ts -> libs/common/src/lib/dtos/update-bulk-market-data.dto.ts -> libs/common/src/lib/dtos/index.ts
+
+  [medium] circular_dependency  libs/common/src/lib/interfaces/activities.interface.ts:0
+    结论：2 个文件构成循环依赖
+    依据：依赖图上的有向环：libs/common/src/lib/interfaces/activities.interface.ts -> libs/common/src/lib/interfaces/index.ts -> libs/common/src/lib/interfaces/activities.interface.ts
+
+  [high  ] circular_dependency  libs/common/src/lib/interfaces/activities.interface.ts:0
+    结论：4 个文件构成循环依赖
+    依据：依赖图上的有向环：libs/common/src/lib/interfaces/activities.interface.ts -> libs/common/src/lib/types/index.ts -> libs/common/src/lib/types/impersonation-context.type.ts -> libs/common/src/lib/interfaces/index.ts -> libs/common/src/lib/interfaces/activities.interface.ts
+
+  [high  ] circular_dependency  libs/common/src/lib/interfaces/benchmark.interface.ts:0
+    结论：4 个文件构成循环依赖
+    依据：依赖图上的有向环：libs/common/src/lib/interfaces/benchmark.interface.ts -> libs/common/src/lib/types/index.ts -> libs/common/src/lib/types/impersonation-context.type.ts -> libs/common/src/lib/interfaces/index.ts -> libs/common/src/lib/interfaces/benchmark.interface.ts
+
+  [medium] circular_dependency  libs/common/src/lib/interfaces/index.ts:0
+    结论：2 个文件构成循环依赖
+    依据：依赖图上的有向环：libs/common/src/lib/interfaces/index.ts -> libs/common/src/lib/interfaces/portfolio-details.interface.ts -> libs/common/src/lib/interfaces/index.ts
+
+  [high  ] circular_dependency  libs/common/src/lib/interfaces/index.ts:0
+    结论：4 个文件构成循环依赖
+    依据：依赖图上的有向环：libs/common/src/lib/interfaces/index.ts -> libs/common/src/lib/interfaces/portfolio-details.interface.ts -> libs/common/src/lib/types/index.ts -> libs/common/src/lib/types/impersonation-context.type.ts -> libs/common/src/lib/interfaces/index.ts
+
+  [high  ] circular_dependency  libs/common/src/lib/interfaces/index.ts:0
+    结论：4 个文件构成循环依赖
+    依据：依赖图上的有向环：libs/common/src/lib/interfaces/index.ts -> libs/common/src/lib/interfaces/portfolio-position.interface.ts -> libs/common/src/lib/types/index.ts -> libs/common/src/lib/types/impersonation-context.type.ts -> libs/common/src/lib/interfaces/index.ts
+
+  [high  ] circular_dependency  libs/common/src/lib/interfaces/index.ts:0
+    结论：4 个文件构成循环依赖
+    依据：依赖图上的有向环：libs/common/src/lib/interfaces/index.ts -> libs/common/src/lib/interfaces/product.interface.ts -> libs/common/src/lib/types/index.ts -> libs/common/src/lib/types/impersonation-context.type.ts -> libs/common/src/lib/interfaces/index.ts
+
+  [high  ] circular_dependency  libs/common/src/lib/interfaces/index.ts:0
+    结论：4 个文件构成循环依赖
+    依据：依赖图上的有向环：libs/common/src/lib/interfaces/index.ts -> libs/common/src/lib/interfaces/responses/account-response.interface.ts -> libs/common/src/lib/types/index.ts -> libs/common/src/lib/types/impersonation-context.type.ts -> libs/common/src/lib/interfaces/index.ts
+
+  [high  ] circular_dependency  libs/common/src/lib/interfaces/index.ts:0
+    结论：4 个文件构成循环依赖
+    依据：依赖图上的有向环：libs/common/src/lib/interfaces/index.ts -> libs/common/src/lib/interfaces/responses/accounts-response.interface.ts -> libs/common/src/lib/types/index.ts -> libs/common/src/lib/types/impersonation-context.type.ts -> libs/common/src/lib/interfaces/index.ts
+
+  [medium] circular_dependency  libs/common/src/lib/interfaces/index.ts:0
+    结论：2 个文件构成循环依赖
+    依据：依赖图上的有向环：libs/common/src/lib/interfaces/index.ts -> libs/common/src/lib/interfaces/responses/activities-response.interface.ts -> libs/common/src/lib/interfaces/index.ts
+
+  [medium] circular_dependency  libs/common/src/lib/interfaces/index.ts:0
+    结论：2 个文件构成循环依赖
+    依据：依赖图上的有向环：libs/common/src/lib/interfaces/index.ts -> libs/common/src/lib/interfaces/responses/activity-response.interface.ts -> libs/common/src/lib/interfaces/index.ts
+
+  [medium] circular_dependency  libs/common/src/lib/interfaces/index.ts:0
+    结论：2 个文件构成循环依赖
+    依据：依赖图上的有向环：libs/common/src/lib/interfaces/index.ts -> libs/common/src/lib/interfaces/responses/benchmark-market-data-details-response.interface.ts -> libs/common/src/lib/interfaces/index.ts
+
+  [medium] circular_dependency  libs/common/src/lib/interfaces/index.ts:0
+    结论：2 个文件构成循环依赖
+    依据：依赖图上的有向环：libs/common/src/lib/interfaces/index.ts -> libs/common/src/lib/interfaces/responses/benchmark-response.interface.ts -> libs/common/src/lib/interfaces/index.ts
+
+  [high  ] circular_dependency  libs/common/src/lib/interfaces/index.ts:0
+    结论：4 个文件构成循环依赖
+    依据：依赖图上的有向环：libs/common/src/lib/interfaces/index.ts -> libs/common/src/lib/interfaces/responses/data-provider-ghostfolio-status-response.interface.ts -> libs/common/src/lib/types/index.ts -> libs/common/src/lib/types/impersonation-context.type.ts -> libs/common/src/lib/interfaces/index.ts
+
+  [medium] circular_dependency  libs/common/src/lib/interfaces/index.ts:0
+    结论：2 个文件构成循环依赖
+    依据：依赖图上的有向环：libs/common/src/lib/interfaces/index.ts -> libs/common/src/lib/interfaces/responses/data-provider-response.interface.ts -> libs/common/src/lib/interfaces/index.ts
+
+  [high  ] circular_dependency  libs/common/src/lib/interfaces/index.ts:0
+    结论：4 个文件构成循环依赖
+    依据：依赖图上的有向环：libs/common/src/lib/interfaces/index.ts -> libs/common/src/lib/interfaces/responses/data-provider-response.interface.ts -> libs/common/src/lib/types/index.ts -> libs/common/src/lib/types/impersonation-context.type.ts -> libs/common/src/lib/interfaces/index.ts
+
+  [medium] circular_dependency  libs/common/src/lib/interfaces/index.ts:0
+    结论：2 个文件构成循环依赖
+    依据：依赖图上的有向环：libs/common/src/lib/interfaces/index.ts -> libs/common/src/lib/interfaces/responses/dividends-response.interface.ts -> libs/common/src/lib/interfaces/index.ts
+
+  [medium] circular_dependency  libs/common/src/lib/interfaces/index.ts:0
+    结论：2 个文件构成循环依赖
+    依据：依赖图上的有向环：libs/common/src/lib/interfaces/index.ts -> libs/common/src/lib/interfaces/responses/errors.interface.ts -> libs/common/src/lib/interfaces/index.ts
+
+  [high  ] circular_dependency  libs/common/src/lib/interfaces/index.ts:0
+    结论：5 个文件构成循环依赖
+    依据：依赖图上的有向环：libs/common/src/lib/interfaces/index.ts -> libs/common/src/lib/interfaces/responses/export-response.interface.ts -> libs/common/src/lib/interfaces/user-settings.interface.ts -> libs/common/src/lib/types/index.ts -> libs/common/src/lib/types/impersonation-context.type.ts -> libs/common/src/lib/interfaces/index.ts
+
+  [medium] circular_dependency  libs/common/src/lib/interfaces/index.ts:0
+    结论：2 个文件构成循环依赖
+    依据：依赖图上的有向环：libs/common/src/lib/interfaces/index.ts -> libs/common/src/lib/interfaces/responses/historical-response.interface.ts -> libs/common/src/lib/interfaces/index.ts
+
+  [medium] circular_dependency  libs/common/src/lib/interfaces/index.ts:0
+    结论：2 个文件构成循环依赖
+    依据：依赖图上的有向环：libs/common/src/lib/interfaces/index.ts -> libs/common/src/lib/interfaces/responses/import-response.interface.ts -> libs/common/src/lib/interfaces/index.ts
+
+  [medium] circular_dependency  libs/common/src/lib/interfaces/index.ts:0
+    结论：2 个文件构成循环依赖
+    依据：依赖图上的有向环：libs/common/src/lib/interfaces/index.ts -> libs/common/src/lib/interfaces/responses/info-response.interface.ts -> libs/common/src/lib/interfaces/index.ts
+
+  [medium] circular_dependency  libs/common/src/lib/interfaces/index.ts:0
+    结论：2 个文件构成循环依赖
+    依据：依赖图上的有向环：libs/common/src/lib/interfaces/index.ts -> libs/common/src/lib/interfaces/responses/market-data-of-markets-response.interface.ts -> libs/common/src/lib/interfaces/index.ts
+
+  [medium] circular_dependency  libs/common/src/lib/interfaces/index.ts:0
+    结论：2 个文件构成循环依赖
+    依据：依赖图上的有向环：libs/common/src/lib/interfaces/index.ts -> libs/common/src/lib/interfaces/responses/portfolio-holding-response.interface.ts -> libs/common/src/lib/interfaces/index.ts
+
+  [medium] circular_dependency  libs/common/src/lib/interfaces/index.ts:0
+    结论：2 个文件构成循环依赖
+    依据：依赖图上的有向环：libs/common/src/lib/interfaces/index.ts -> libs/common/src/lib/interfaces/responses/portfolio-holdings-response.interface.ts -> libs/common/src/lib/interfaces/index.ts
+
+  [medium] circular_dependency  libs/common/src/lib/interfaces/index.ts:0
+    结论：2 个文件构成循环依赖
+    依据：依赖图上的有向环：libs/common/src/lib/interfaces/index.ts -> libs/common/src/lib/interfaces/responses/public-portfolio-response.interface.ts -> libs/common/src/lib/interfaces/index.ts
+
+  [high  ] circular_dependency  libs/common/src/lib/interfaces/index.ts:0
+    结论：4 个文件构成循环依赖
+    依据：依赖图上的有向环：libs/common/src/lib/interfaces/index.ts -> libs/common/src/lib/interfaces/responses/public-portfolio-response.interface.ts -> libs/common/src/lib/types/index.ts -> libs/common/src/lib/types/impersonation-context.type.ts -> libs/common/src/lib/interfaces/index.ts
+
+  [medium] circular_dependency  libs/common/src/lib/interfaces/index.ts:0
+    结论：2 个文件构成循环依赖
+    依据：依赖图上的有向环：libs/common/src/lib/interfaces/index.ts -> libs/common/src/lib/interfaces/responses/quotes-response.interface.ts -> libs/common/src/lib/interfaces/index.ts
+
+  [medium] circular_dependency  libs/common/src/lib/interfaces/index.ts:0
+    结论：2 个文件构成循环依赖
+    依据：依赖图上的有向环：libs/common/src/lib/interfaces/index.ts -> libs/common/src/lib/interfaces/responses/watchlist-response.interface.ts -> libs/common/src/lib/interfaces/index.ts
+
+  [medium] circular_dependency  libs/common/src/lib/interfaces/index.ts:0
+    结论：2 个文件构成循环依赖
+    依据：依赖图上的有向环：libs/common/src/lib/interfaces/index.ts -> libs/common/src/lib/interfaces/symbol-item.interface.ts -> libs/common/src/lib/interfaces/index.ts
+
+  [high  ] circular_dependency  libs/common/src/lib/interfaces/index.ts:0
+    结论：4 个文件构成循环依赖
+    依据：依赖图上的有向环：libs/common/src/lib/interfaces/index.ts -> libs/common/src/lib/interfaces/symbol-metrics.interface.ts -> libs/common/src/lib/types/index.ts -> libs/common/src/lib/types/impersonation-context.type.ts -> libs/common/src/lib/interfaces/index.ts
+
+  [high  ] circular_dependency  libs/common/src/lib/interfaces/index.ts:0
+    结论：4 个文件构成循环依赖
+    依据：依赖图上的有向环：libs/common/src/lib/interfaces/index.ts -> libs/common/src/lib/interfaces/user.interface.ts -> libs/common/src/lib/types/index.ts -> libs/common/src/lib/types/impersonation-context.type.ts -> libs/common/src/lib/interfaces/index.ts
+
+  [medium] circular_dependency  libs/common/src/lib/models/index.ts:0
+    结论：2 个文件构成循环依赖
+    依据：依赖图上的有向环：libs/common/src/lib/models/index.ts -> libs/common/src/lib/models/portfolio-snapshot.ts -> libs/common/src/lib/models/index.ts
+
+  [medium] circular_dependency  libs/common/src/lib/types/impersonation-context.type.ts:0
+    结论：2 个文件构成循环依赖
+    依据：依赖图上的有向环：libs/common/src/lib/types/impersonation-context.type.ts -> libs/common/src/lib/types/index.ts -> libs/common/src/lib/types/impersonation-context.type.ts
+
+  [medium] circular_dependency  libs/common/src/lib/types/index.ts:0
+    结论：2 个文件构成循环依赖
+    依据：依赖图上的有向环：libs/common/src/lib/types/index.ts -> libs/common/src/lib/types/request-with-user.type.ts -> libs/common/src/lib/types/index.ts
+
+  [medium] layering_violation  apps/api/src/app/portfolio/calculator/portfolio-calculator.factory.ts:0
+    结论：apps/api/src/app/portfolio/calculator/{mwr,roi,twr} 反向依赖 apps/api/src/app/{portfolio,redis-cache}，与主导方向相反
+    依据：两模块间共 46 条边，其中 3 条方向为 apps/api/src/app/portfolio/calculator/{mwr,roi,twr} -> apps/api/src/app/{portfolio,redis-cache}，占比 7%；导入目标 apps/api/src/app/portfolio/calculator/roai/portfolio-calculator.ts
+
+  [medium] layering_violation  apps/api/src/app/portfolio/calculator/portfolio-calculator.factory.ts:0
+    结论：apps/api/src/app/portfolio/calculator/{mwr,roi,twr} 反向依赖 apps/api/src/app/{portfolio,redis-cache}，与主导方向相反
+    依据：两模块间共 46 条边，其中 3 条方向为 apps/api/src/app/portfolio/calculator/{mwr,roi,twr} -> apps/api/src/app/{portfolio,redis-cache}，占比 7%；导入目标 apps/api/src/app/redis-cache/redis-cache.service.ts
+
+  [medium] layering_violation  apps/api/src/app/portfolio/calculator/portfolio-calculator.ts:0
+    结论：apps/api/src/app/portfolio/calculator/{mwr,roi,twr} 反向依赖 apps/api/src/app/{portfolio,redis-cache}，与主导方向相反
+    依据：两模块间共 46 条边，其中 3 条方向为 apps/api/src/app/portfolio/calculator/{mwr,roi,twr} -> apps/api/src/app/{portfolio,redis-cache}，占比 7%；导入目标 apps/api/src/app/redis-cache/redis-cache.service.ts
+
+  [medium] layering_violation  apps/api/src/app/portfolio/portfolio.module.ts:0
+    结论：apps/api/src/app/portfolio 反向依赖 apps/api/src/app/{portfolio,redis-cache}，与主导方向相反
+    依据：两模块间共 43 条边，其中 1 条方向为 apps/api/src/app/portfolio -> apps/api/src/app/{portfolio,redis-cache}，占比 2%；导入目标 apps/api/src/app/redis-cache/redis-cache.module.ts
+
+  [medium] layering_violation  apps/api/src/services/queues/portfolio-snapshot/portfolio-snapshot.module.ts:0
+    结论：apps/api/src/services/queues/portfolio-snapshot/{interfaces} 反向依赖 apps/api/src/app/{portfolio,redis-cache}，与主导方向相反
+    依据：两模块间共 45 条边，其中 3 条方向为 apps/api/src/services/queues/portfolio-snapshot/{interfaces} -> apps/api/src/app/{portfolio,redis-cache}，占比 7%；导入目标 apps/api/src/app/redis-cache/redis-cache.module.ts
+
+  [medium] layering_violation  apps/api/src/services/queues/portfolio-snapshot/portfolio-snapshot.processor.ts:0
+    结论：apps/api/src/services/queues/portfolio-snapshot/{interfaces} 反向依赖 apps/api/src/app/{portfolio,redis-cache}，与主导方向相反
+    依据：两模块间共 45 条边，其中 3 条方向为 apps/api/src/services/queues/portfolio-snapshot/{interfaces} -> apps/api/src/app/{portfolio,redis-cache}，占比 7%；导入目标 apps/api/src/app/redis-cache/redis-cache.service.ts
+
+  [medium] layering_violation  apps/api/src/services/queues/portfolio-snapshot/portfolio-snapshot.service.mock.ts:0
+    结论：apps/api/src/services/queues/portfolio-snapshot/{interfaces} 反向依赖 apps/api/src/app/{portfolio,redis-cache}，与主导方向相反
+    依据：两模块间共 45 条边，其中 3 条方向为 apps/api/src/services/queues/portfolio-snapshot/{interfaces} -> apps/api/src/app/{portfolio,redis-cache}，占比 7%；导入目标 apps/api/src/app/redis-cache/redis-cache.service.mock.ts
+
+  [medium] layering_violation  libs/common/src/lib/types/impersonation-context.type.ts:0
+    结论：libs/common/src/lib/types 反向依赖 libs/common/src/lib/interfaces，与主导方向相反
+    依据：两模块间共 11 条边，其中 2 条方向为 libs/common/src/lib/types -> libs/common/src/lib/interfaces，占比 18%；导入目标 libs/common/src/lib/interfaces/index.ts
+
+  [medium] layering_violation  libs/common/src/lib/types/user-with-settings.type.ts:0
+    结论：libs/common/src/lib/types 反向依赖 libs/common/src/lib/interfaces，与主导方向相反
+    依据：两模块间共 11 条边，其中 2 条方向为 libs/common/src/lib/types -> libs/common/src/lib/interfaces，占比 18%；导入目标 libs/common/src/lib/interfaces/index.ts
+
+  [low   ] oversized_module  libs/common/src/lib/interfaces/access-settings.interface.ts:0
+    结论：模块 libs/common/src/lib/interfaces 含 51 个文件，超出 40
+    依据：模块内部边 75、外部边 52；分组来历 directory
+
+  [low   ] oversized_module  libs/common/src/lib/interfaces/responses/access-token-response.interface.ts:0
+    结论：模块 libs/common/src/lib/interfaces/responses 含 41 个文件，超出 40
+    依据：模块内部边 1、外部边 36；分组来历 directory
+
+  [low   ] swallowed_exception  apps/api/src/app/user/user.service.ts:759
+    结论：空catch块完全吞掉异常且无日志记录，若删除关联记录因非预期原因（如数据库连接问题）失败，将掩盖根因，导致后续user.delete()因外键约束失败时难以排查。
+    依据：异常处理块内只有占位语句（pass / ... / 注释），既未记录也未重抛，异常信息在此处完全丢失（certain 级候选，已经模型复核）
+
+  [low   ] swallowed_exception  apps/api/src/app/user/user.service.ts:765
+    结论：同上，空catch块吞掉异常且无任何日志记录，掩盖潜在的删除失败原因。
+    依据：异常处理块内只有占位语句（pass / ... / 注释），既未记录也未重抛，异常信息在此处完全丢失（certain 级候选，已经模型复核）
+
+  [low   ] swallowed_exception  apps/api/src/app/user/user.service.ts:771
+    结论：同上，空catch块吞掉异常且无任何日志记录，掩盖潜在的删除失败原因。
+    依据：异常处理块内只有占位语句（pass / ... / 注释），既未记录也未重抛，异常信息在此处完全丢失（certain 级候选，已经模型复核）
+
+  [low   ] swallowed_exception  apps/api/src/app/user/user.service.ts:777
+    结论：同上，空catch块吞掉异常且无任何日志记录，掩盖潜在的删除失败原因。
+    依据：异常处理块内只有占位语句（pass / ... / 注释），既未记录也未重抛，异常信息在此处完全丢失（certain 级候选，已经模型复核）
+
+  [low   ] swallowed_exception  apps/api/src/app/user/user.service.ts:783
+    结论：同上，空catch块吞掉异常且无任何日志记录，掩盖潜在的删除失败原因，且是最后一次清理，紧邻实际的user.delete调用。
+    依据：异常处理块内只有占位语句（pass / ... / 注释），既未记录也未重抛，异常信息在此处完全丢失（certain 级候选，已经模型复核）

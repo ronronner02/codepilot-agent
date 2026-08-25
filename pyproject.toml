@@ -1,0 +1,56 @@
+[project]
+name = "codepilot-agent"
+version = "0.1.0"
+description = "多 Agent 代码分析助手：输入 GitHub 仓库地址，产出可追溯到文件的架构分析报告"
+requires-python = ">=3.11"
+dependencies = [
+    "langgraph>=1.0.6",
+    "langchain-core>=0.3",
+    "openai>=1.40",
+    "tree-sitter>=0.25",
+    "tree-sitter-language-pack>=0.13",
+    "chromadb>=0.5",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "sse-starlette>=2.1",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    "httpx>=0.27",
+    # 上界必须钉住：mcp 2.x 移除了 `mcp.server.fastmcp`（子模块改名为 mcpserver），
+    # 而 server.py 是按 1.x 的 FastMCP API 写的。开区间下今天全新安装会解析到 2.1.0，
+    # 结果 MCP server 与它的测试直接 ModuleNotFoundError——本机装的是 1.27 所以看不出来。
+    # 这个缺口是照 README 全新 clone 走一遍时才暴露的。升 2.x 是独立的迁移工作。
+    "mcp>=1.27,<2",
+    # openai 3.x 走 httpx2，后者解 brotli 响应时调 decompressor.process(..., output_buffer_limit=)
+    # ——那个关键字参数是 Brotli 1.1 才有的。装 1.0.x 时所有 SDK 调用都报
+    # APIConnectionError，而底层原因是 TypeError，离现象很远。实测踩过。
+    "Brotli>=1.1.0",
+]
+
+[project.optional-dependencies]
+local-embedding = [
+    "sentence-transformers>=3.3",
+]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "mypy>=1.13",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["backend"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+ignore_missing_imports = true

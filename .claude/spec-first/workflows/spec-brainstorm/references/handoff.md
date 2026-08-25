@@ -1,0 +1,162 @@
+# Handoff
+
+This content is loaded when Phase 4 begins — after the requirements-only
+unified plan is written.
+
+---
+
+#### 4.1 Present Next-Step Options
+
+The Phase 4 menu's visible option count varies by state: no unified plan
+artifact hides the review and browser options, `OUTPUT_FORMAT` selects
+whether the browser option renders and the document-review mutation policy, unresolved
+`Resolve Before Planning` hides both `Create the implementation plan` and
+`Ship it autonomously with spec-lfg`, and the spec-lfg option is also hidden
+for non-software brainstorms (`execution` other than `code`). Count the visible
+options for the current state and choose the rendering mode accordingly:
+
+- **Visible count fits the current platform's option cap:** use the platform's blocking question tool (`AskUserQuestion` in Claude Code — call `ToolSearch` with `select:AskUserQuestion` first if its schema isn't loaded; `request_user_input` in Codex). Claude Code `AskUserQuestion` supports up to 4 explicit options, and Codex `request_user_input` supports only 2-3 explicit options.
+- **Visible count exceeds the current platform's option cap:** render as a numbered list in chat. This is the narrow option-overflow fallback; trimming would hide legitimate choices (plan, ship, review, browser, refine are all distinct destinations). Include a hint that free-form input is accepted ("Pick a number or describe what you want.") so the numbered list retains the blocking tool's open-endedness.
+
+Never silently skip the question.
+
+If `Resolve Before Planning` contains any items:
+- Ask the blocking questions now, one at a time, by default
+- Keep the next highest-impact question, its source attempt, and its Product Contract write target in the durable artifact. The artifact also retains source refs, snapshots, limitations, and invalidation conditions so resume does not depend on transcript or `/tmp` dossier.
+- If the user explicitly wants to proceed anyway, first convert each remaining item into an explicit decision, assumption, or `Deferred to Planning` question
+- If the user chooses to pause instead, present the handoff as paused or blocked rather than complete
+- Do not offer the `Create the implementation plan` or `Ship it autonomously with spec-lfg` options while `Resolve Before Planning` remains non-empty
+
+In both preambles below, the "Pick a number or describe what you want." hint applies only in numbered-list mode. When using the blocking tool, omit that line and pass the remaining stem as the question.
+
+**Path format:** Use absolute paths for chat-output file references — relative paths are not auto-linked as clickable in most terminals.
+
+**Preamble when no blocking questions remain:**
+
+```
+Brainstorm complete.
+
+Plan artifact: <absolute path to requirements-only unified plan>  # omit line if no artifact was created
+
+What would you like to do next? (Pick a number or describe what you want.)
+```
+
+**Preamble when blocking questions remain and user wants to pause:**
+
+```
+Brainstorm paused. Planning is blocked until the remaining questions are resolved.
+
+Plan artifact: <absolute path to requirements-only unified plan>  # omit line if no artifact was created
+
+What would you like to do next? (Pick a number or describe what you want.)
+```
+
+Present only the options that apply. Renumber so visible options stay contiguous starting at 1.
+
+1. **Create the implementation plan** *(recommended)* - Hand off to `spec-plan` and sharpen the requirements into a complete, testable plan. Shown only when `Resolve Before Planning` is empty.
+2. **Ship it autonomously with `spec-lfg`** - Hand the requirements to the full autonomous pipeline: `spec-lfg` plans (`spec-plan`), implements, simplifies, 委派一组独立、只读的 reviewer 执行代码审查并应用合格修复, opens a PR, and watches CI to green — hands-off, no pipeline check-ins. It plans first (unlike a raw `/goal` straight from requirements), so it's the safer autonomous path. Best when you trust the requirements and want it built and shipped without steering. **Opens a PR and pushes a branch. 此选择只授权上述委派的独立只读审查，不授权任意 worker dispatch。When browser verification applies, its caller or upstream runtime must provide a caller-owned target origin; selecting this option does not authorize a project server command.** The caller owns project-server startup and shutdown, and a missing origin blocks the applicable browser flow rather than triggering automatic startup. Shown only for software brainstorms (`execution: code`) with `Resolve Before Planning` empty **and a unified plan artifact was created** — `spec-lfg` hands `spec-plan` that artifact path in pipeline mode and cannot prompt, so with no artifact (e.g. a brief-alignment brainstorm that skipped doc creation per the "Decide whether a doc is warranted" rule) there is nothing to enrich; offer option 1 instead, which can plan interactively from the conversation. For a quicker plan-then-decide flow, or to run a `/goal` yourself, pick option 1 and choose at the `spec-plan` handoff.
+3. **Pressure-test the requirements** - Run `spec-doc-review` to find gaps, conflicts, weak premises, and scope issues in the requirements. Shown whenever a unified plan exists, for both `OUTPUT_FORMAT=md` and `OUTPUT_FORMAT=html`. This option is report-only for both formats: `fixes_applied: 0`, findings and producer-fix candidates are surfaced, and requirement edits remain owned by `spec-brainstorm` or a later explicit `mutation:apply-fixes` request.
+4. **Open in browser** — open the HTML unified plan locally for review and sharing. Shown only when an HTML unified plan exists. **Render only when `OUTPUT_FORMAT=html`.**
+5. **More clarifying questions to sharpen the doc** - Keep refining scope, edge cases, constraints, and preferences through further dialogue. Always shown.
+
+There is no "done" / "pause" option — the blocking question already waits, and the user ends by dismissing it (Esc) or saying they're finished. The unified plan artifact is already saved.
+
+**Post-review nudge (subsequent rounds only):** If the user has already run `spec-doc-review` this session and residual P0/P1 findings remain unaddressed, add a one-line prose nudge adjacent to the menu (e.g., "Document review flagged 2 P1 findings you may want to address — pick \"Pressure-test the requirements\" to run another pass."). Reference the option by label, not number: the menu renumbers when `Resolve Before Planning` hides `Create the implementation plan` and the spec-lfg option, so a hardcoded option number can point users at the wrong action. Do not add a separate menu option; reuse the existing `Pressure-test the requirements` option in both output formats.
+
+#### 4.2 Handle the Selected Option
+
+Selections may be the literal option label (when the user types the label or a close paraphrase) or the option number. Match numbers against the currently-rendered (post-trim) list. Free-form input that doesn't match an option or describe an alternative action should be treated as clarification — ask a follow-up rather than guessing.
+
+**If user selects "Create the implementation plan":**
+
+Immediately load the `spec-plan` skill in the current session. Pass the unified
+plan artifact path when one exists; otherwise pass a concise summary of the
+finalized brainstorm decisions. When the Phase 1.1 grounding scout produced a
+dossier and the file still exists, also pass its path
+(`<private-scratch-dir>/grounding.md`) — it gives
+planning verified quotes with `file:line` pointers to start from instead of
+re-scanning the repo. Do not print the closing summary first.
+
+**If user selects "Pressure-test the requirements":**
+
+Load the `spec-doc-review` skill. For `OUTPUT_FORMAT=md`, pass the unified plan
+path as the argument. For `OUTPUT_FORMAT=html`, pass
+`mutation:report-only <unified-plan-path>` so the zero-write boundary is explicit
+even though HTML classification also makes it mandatory. When spec-doc-review
+returns "Review complete", return to the Phase 4 options and re-render the menu.
+HTML review is byte-preserving: preserve the artifact bytes and surface report-only findings or producer-fix
+candidates without implying they were applied. In both formats, re-evaluate the
+spec-lfg software gate and residual
+findings; if residual P0/P1 findings remain unaddressed, include the post-review
+nudge above the menu. Do not show the closing summary yet.
+
+**If user selects "Ship it autonomously with `spec-lfg`":**
+
+The current user's selection is the explicit request for the disclosed autonomous
+pipeline and its commit, push, PR, and CI side effects. Immediately invoke the
+`spec-lfg` skill in the current session via the platform's skill-invocation
+primitive, passing the unified plan artifact path as its argument so `spec-lfg`'s
+`spec-plan` step enriches *this* requirements-only artifact in place rather than
+bootstrapping a new plan.
+
+Pass the absolute unified plan path as the complete argument payload. Do not
+prepend the option number or label, append a prose summary, convert it to a
+repo-relative path, or substitute another recent plan. The path displayed in the
+`Plan artifact:` line and the path passed to `spec-lfg` must be identical.
+
+Resolve the canonical `spec-lfg` name against the active host's available-skills
+list and call the exact listed entry; never shorten it to `lfg`. If the host lists
+a namespaced form, use that exact form. A rejected short-name call is not evidence
+that `spec-lfg` is uninstalled. Once invoked, `spec-lfg` owns the full pipeline —
+plan, implement (`spec-work` in `return-to-caller` mode), simplify, independent
+code review and applied fixes, commit/push/open PR, and CI watch to green. Do not
+also start a `/goal` or load `spec-work` directly.
+
+Where the host genuinely exposes no skill-invocation primitive, print the exact
+host-native `spec-lfg` user invocation with the absolute plan path as a degraded
+fallback and explain why seamless entry was unavailable.
+
+Do not print the closing summary first.
+
+**If user selects "More clarifying questions to sharpen the doc":** Return to Phase 1.3 (Collaborative Dialogue) and continue asking the user clarifying questions one at a time to further refine scope, edge cases, constraints, and preferences. Continue until the user is satisfied, then return to Phase 4. Do not show the closing summary yet.
+
+**If user selects "Open in browser":** Display the absolute path to the `.html` unified plan so the user can open it locally. Where the platform exposes a browser-opening primitive (e.g., `open` on macOS, `xdg-open` on Linux, `start` on Windows), the agent may invoke it directly; otherwise print the absolute path and let the user open it. After the path is displayed (or the browser is opened), return to the Phase 4 options so the user can pick a follow-up action.
+
+**If the user indicates they're finished** (says "done"/"that's all", or dismisses the menu without picking an option): display the closing summary (see 4.3) and end the turn.
+
+#### 4.3 Closing Summary
+
+Use the closing summary only when this run of the workflow is ending or handing off, not when returning to the Phase 4 options.
+
+In both templates below, substitute `<absolute path to unified plan>` with the
+actual file path written this run — `.md` for `OUTPUT_FORMAT=md`, `.html` for
+`OUTPUT_FORMAT=html`. Do not emit a hardcoded `.md` path when the artifact is
+HTML, or the closing summary will point users at a file that was never written.
+
+When complete and ready for planning, display:
+
+```text
+Brainstorm complete!
+
+Plan artifact: <absolute path to unified plan>  # omit line if no artifact was created
+
+Key decisions:
+- [Decision 1]
+- [Decision 2]
+
+Recommended next step: `spec-plan <plan artifact path>`
+```
+
+If the user pauses with `Resolve Before Planning` still populated, display:
+
+```text
+Brainstorm paused.
+
+Plan artifact: <absolute path to unified plan>  # omit line if no artifact was created
+
+Planning is blocked by:
+- [Blocking question 1]
+- [Blocking question 2]
+
+Resume with `spec-brainstorm` when ready to resolve these before planning.
+```

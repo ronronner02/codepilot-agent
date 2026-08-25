@@ -1,0 +1,81 @@
+
+==============================================================================
+仓库 fastapi__fastapi
+==============================================================================
+解析 1138 个文件，取前 60 个索引，切出 719 块
+  块类型分布：{'module': 99, 'class_header': 106, 'function_part': 84, 'method': 137, 'function': 293}
+  超过 200 行的块：20
+
+--- 首次索引（provider=api:qwen3-embedding-8b:v1）---
+  耗时 277.8s，入库 719 块，embedding 调用 12 次，完整=True
+
+--- 二次运行（应命中缓存）---
+  耗时 0.05s，命中=True，embedding 调用 0 次
+  加速比 6094x
+  缓存说明：命中已有索引（repo=fastapi/fastapi commit=bench0000000 provider=api:qwen3-embedding-8b:v1 chunks=v1），跳过解析与向量化
+
+--- 切换 provider 后应未命中 ---
+  命中=False；说明：缓存未命中，因以下变化：embedding provider：api:qwen3-embedding-8b:v1 -> other:model-x:v1
+
+--- 检索抽查 ---
+
+  查询：如何把依赖注入解析成参数（预期路径含 'dependencies' -> 未命中预期）
+    0.4020  fastapi/param_functions.py:2283-2369  Depends
+           def Depends(  # noqa: N802
+    0.4140  fastapi/params.py:745-749  Depends
+           @dataclass(frozen=True)
+    0.4518  fastapi/param_functions.py:2372-2460  Security
+           def Security(  # noqa: N802
+
+  查询：OpenAPI schema 是怎么生成的（预期路径含 'openapi' -> 未命中预期）
+    0.2647  fastapi/applications.py:1070-1103  FastAPI.openapi
+           def openapi(self) -> dict[str, Any]:
+    0.3137  tests/test_arbitrary_types.py:92-135  test_openapi_schema
+           def test_openapi_schema(client: TestClient):
+    0.3341  tests/test_additional_properties.py:27-114  test_openapi_schema
+           def test_openapi_schema():
+
+  查询：请求校验失败时如何返回错误（预期路径含 'exception' -> 未命中预期）
+    0.3882  tests/test_additional_responses_custom_validationerror.py:19-20  JsonApiError
+           class JsonApiError(BaseModel):
+    0.4029  tests/test_additional_responses_custom_validationerror.py:14-16  Error
+           class Error(BaseModel):
+    0.4177  tests/test_additional_responses_custom_validationerror.py:23-29  a
+           @app.get(
+
+==============================================================================
+仓库 ghostfolio__ghostfolio
+==============================================================================
+解析 864 个文件，取前 60 个索引，切出 190 块
+  块类型分布：{'module': 50, 'function': 4, 'class_header': 20, 'method': 114, 'function_part': 2}
+  超过 200 行的块：0
+
+--- 首次索引（provider=api:qwen3-embedding-8b:v1）---
+  耗时 75.3s，入库 190 块，embedding 调用 3 次，完整=True
+
+--- 二次运行（应命中缓存）---
+  耗时 0.02s，命中=True，embedding 调用 0 次
+  加速比 3534x
+  缓存说明：命中已有索引（repo=ghostfolio/ghostfolio commit=bench0000000 provider=api:qwen3-embedding-8b:v1 chunks=v1），跳过解析与向量化
+
+--- 切换 provider 后应未命中 ---
+  命中=False；说明：缓存未命中，因以下变化：embedding provider：api:qwen3-embedding-8b:v1 -> other:model-x:v1
+
+--- 检索抽查 ---
+
+  查询：投资组合收益是怎么计算的（预期路径含 'portfolio' -> 未命中预期）
+    0.3704  libs/ui/src/lib/fire-calculator/fire-calculator.component.ts:509-527  GfFireCalculatorComponent.getProjectedTotalAmount
+           private getProjectedTotalAmount() {
+    0.3981  libs/ui/src/lib/fire-calculator/fire-calculator.component.ts:470-472  GfFireCalculatorComponent.getP
+           private getP() {
+    0.4103  libs/ui/src/lib/fire-calculator/fire-calculator.component.ts:505-507  GfFireCalculatorComponent.getPMT
+           private getPMT() {
+
+  查询：用户认证用了哪些策略（预期路径含 'auth' -> 未命中预期）
+    0.4842  libs/ui/src/lib/fire-calculator/fire-calculator.component.ts:470-472  GfFireCalculatorComponent.getP
+           private getP() {
+    0.5084  libs/ui/src/lib/account-selector/account-selector.component.ts:94-98  GfAccountSelectorComponent.ngOnInit
+           public ngOnInit() {
+    0.5137  libs/ui/src/lib/fire-calculator/fire-calculator.component.ts:505-507  GfFireCalculatorComponent.getPMT
+           private getPMT() {
+DONE exit=0

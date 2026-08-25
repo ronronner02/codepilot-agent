@@ -1,0 +1,271 @@
+/**
+ * 工作台外壳与结果统计（PRD 2026-08-25-002 的 AE-01 至 AE-09）。
+ *
+ * 与 App.test.tsx 分开：那份测的是状态机与 SSE 生命周期，这份测的是改版新增的外壳、
+ * 锚点导航与统计口径。两者共用同一批固件，但关注点不同，混在一个文件里会让失败信号
+ * 指向不明。
+ *
+ * 这里有两条断言是**防回归**而非验功能：三个区块标题必须同时存在（锚点导航不得退化成
+ * 视图切换），以及 role="status" / role="alert" 的数量不得增加（统计区不得挂播报角色）。
+ * 两者一旦破坏，App.test.tsx 会大面积失败而原因不明显——所以在这里直接钉住。
+ */
+
+import { act, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { describe, expect, it, vi } from 'vitest'
+import { App } from '../App'
+import type { AnalysisResult, ProgressEvent } from '../api/types'
+import { MockEventSource } from './setup'
+
+const REPO = 'https://github.com/acme/widget'
+
+function progress(overrides: Partial<ProgressEvent> = {}): ProgressEvent {
+  return { stage: 'parsing', label: '解析代码', detail: '', percent: 20, failed: false, ...overrides }
+}
+
+function result(overrides: Partial<AnalysisResult> = {}): AnalysisResult {
+  return {
+    task_id: 't1',
+    repo: 'acme/widget',
+    stage: 'done',
+    completed: true,
+    failed: false,
+    error: '',
+    report: {
+      repo: 'acme/widget',
+      commit_sha: 'abcdef123456789',
+      summary: '总体印象文本',
+      sections: [
+        {
+          key: 'module_breakdown',
+          title: '模块划分',
+          claims: [
+            {
+              text: '核心逻辑集中在 pkg/core.py',
+              citations: [
+                { path: 'pkg/core.py', line: 10, end_line: 42 },
+                { path: 'pkg/util.py', line: 3, end_line: null },
+              ],
+            },
+          ],
+        },
+      ],
+      missing: { text: '本次分析无缺失部分', unparsed_files: 0, skipped_modules: 0 },
+      validation_summary: '共 1 条结论：1 条引用完全有效。',
+      unsupported_claims: [],
+    },
+    review: {
+      target_files: ['pkg/core.py'],
+      outcomes: [
+        { category: 'structural', status: 'executed', scope: '1 个文件', hit_count: 3, reason: '' },
+        {
+          category: 'security',
+          status: 'skipped',
+          scope: '1 个文件',
+          hit_count: 0,
+          reason: '未配置 LLM provider',
+        },
+      ],
+      findings: [
+        {
+          category: 'structural',
+          kind: 'circular_dependency',
+          path: 'pkg/a.py',
+          line: 0,
+          severity: 'high',
+          message: '3 个文件构成循环依赖',
+          evidence: '依赖图上的有向环',
+        },
+        {
+          category: 'error_handling',
+          kind: 'bare_except',
+          path: 'pkg/b.py',
+          line: 12,
+          severity: 'medium',
+          message: '裸 except 吞掉异常',
+          evidence: 'except 子句无类型',
+        },
+        {
+          category: 'structural',
+          kind: 'long_module',
+          path: 'pkg/c.py',
+          line: 1,
+          severity: 'low',
+          message: '模块过长',
+          evidence: '行数超阈值',
+        },
+      ],
+    },
+    index: { cache_hit: false, chunk_count: 318, identity: 'api:m:v1', note: '新建索引' },
+    module_failures: [],
+    ...overrides,
+  }
+}
+
+function stubFetch(overrides: Partial<AnalysisResult> = {}): { calls: string[] } {
+  const calls: string[] = []
+  const json = (body: unknown): Response =>
+    new Response(JSON.stringify(body), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })
+
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input.toString()
+      const method = init?.method ?? 'GET'
+      calls.push(`${method} ${url}`)
+      if (method === 'POST') {
+        return json({ task_id: 't1', repo: 'acme/widget', stage: 'queued', message: 'ok' })
+      }
+      return json(result(overrides))
+    }),
+  )
+  return { calls }
+}
+
+async function completeAnalysis(overrides: Partial<AnalysisResult> = {}): Promise<string[]> {
+  const { calls } = stubFetch(overrides)
+  render(<App />)
+  const user = userEvent.setup()
+  await user.type(screen.getByLabelText('GitHub 仓库地址'), REPO)
+  await user.click(screen.getByRole('button', { name: '开始分析' }))
+  await screen.findByRole('heading', { name: '分析进度' })
+  await act(async () => {
+    MockEventSource.latest().emit(progress({ stage: 'done', label: '完成', percent: 100 }))
+  })
+  await screen.findByRole('heading', { name: '架构报告' })
+  return calls
+}
+
+describe('工作台外壳', () => {
+  it('未提交时顶部条走空态（AE-08）', () => {
+    stubFetch()
+    render(<App />)
+    expect(screen.getByText('未选择仓库')).toBeInTheDocument()
+    expect(screen.getByText('未开始')).toBeInTheDocument()
+    expect(screen.getByText('尚无任务')).toBeInTheDocument()
+  })
+
+  it('阶段文案只出现一处，侧栏底部改放任务标识', async () => {
+    await completeAnalysis()
+    // 顶部条吸顶常驻，侧栏再显示同一个状态是纯冗余。
+    expect(screen.getAllByText('已完成')).toHaveLength(1)
+    expect(screen.getByText('任务 t1')).toBeInTheDocument()
+  })
+
+  it('分析完成后顶部条显示仓库与 commit 前 12 位（AE-09）', async () => {
+    await completeAnalysis()
+    // 顶部条的仓库标识与报告内的元信息各出现一次。
+    expect(screen.getAllByText('acme/widget').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByText('abcdef123456')).toBeInTheDocument()
+    expect(screen.getByText('已完成')).toBeInTheDocument()
+  })
+
+  it('结果未就绪时报告/评审/问答导航置灰', () => {
+    stubFetch()
+    render(<App />)
+    expect(screen.getByRole('button', { name: '概览' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: '报告' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '评审' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '问答' })).toBeDisabled()
+  })
+
+  it('点击导航项设为当前项，且三个区块仍全部在 DOM（AE-01）', async () => {
+    await completeAnalysis()
+    const user = userEvent.setup()
+
+    const review = screen.getByRole('button', { name: '评审' })
+    await user.click(review)
+
+    expect(review).toHaveAttribute('aria-current', 'true')
+    // 锚点导航不得退化成视图切换：三个标题必须共存。
+    expect(screen.getByRole('heading', { name: '架构报告' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '代码评审' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '代码问答' })).toBeInTheDocument()
+  })
+})
+
+describe('结果统计', () => {
+  it('四项统计口径正确且不发额外请求（AE-02）', async () => {
+    const calls = await completeAnalysis()
+    const stats = screen.getByLabelText('分析结果统计')
+
+    // 发现 3 条、引用 2 条、切块 318、未完成模块 0。
+    expect(stats).toHaveTextContent('3评审发现')
+    expect(stats).toHaveTextContent('2可核验引用')
+    expect(stats).toHaveTextContent('318索引切块')
+    expect(stats).toHaveTextContent('0未完成模块')
+
+    // 统计全部由已有结果派生：只有提交与取结果两次请求。
+    expect(calls.filter((call) => call.startsWith('GET')).length).toBe(1)
+  })
+
+  it('严重度分布按高中低分段并带计数（AE-02）', async () => {
+    await completeAnalysis()
+    const stats = screen.getByLabelText('分析结果统计')
+    expect(stats).toHaveTextContent('高危 1')
+    expect(stats).toHaveTextContent('中危 1')
+    expect(stats).toHaveTextContent('低危 1')
+  })
+
+  it('图例文案不与评审徽标文本相同', async () => {
+    await completeAnalysis()
+    // 「高」只属于发现列表的徽标；统计图例用「高危 N」，否则按文本查询会多匹配。
+    expect(screen.getByText('高')).toBeInTheDocument()
+    expect(screen.getByText('中')).toBeInTheDocument()
+  })
+
+  it('零发现时统计显示 0 且不渲染空分布条（AE-03）', async () => {
+    await completeAnalysis({
+      review: { target_files: [], outcomes: [], findings: [] },
+    })
+    const stats = screen.getByLabelText('分析结果统计')
+    expect(stats).toHaveTextContent('0评审发现')
+    expect(stats).toHaveTextContent('0 条发现')
+    expect(stats.querySelector('.sev__track')).toBeNull()
+  })
+
+  it('无索引与零切块可区分', async () => {
+    await completeAnalysis({ index: null })
+    expect(screen.getByLabelText('分析结果统计')).toHaveTextContent('—索引切块')
+  })
+
+  it('未知严重度落进「其它」而非被丢弃', async () => {
+    await completeAnalysis({
+      review: {
+        target_files: [],
+        outcomes: [],
+        findings: [
+          {
+            category: 'structural',
+            kind: 'x',
+            path: 'p.py',
+            line: 1,
+            severity: 'critical',
+            message: 'm',
+            evidence: 'e',
+          },
+        ],
+      },
+    })
+    expect(screen.getByLabelText('分析结果统计')).toHaveTextContent('其它 1')
+  })
+
+  it('统计区不呈现执行过程信息（AE-07）', async () => {
+    await completeAnalysis()
+    const stats = screen.getByLabelText('分析结果统计')
+    for (const word of ['耗时', 'token', '扇出', '工具调用']) {
+      expect(stats.textContent ?? '').not.toContain(word)
+    }
+  })
+
+  it('统计区不新增播报角色（AE-05）', async () => {
+    await completeAnalysis()
+    const stats = screen.getByLabelText('分析结果统计')
+    expect(stats.querySelector('[role="status"]')).toBeNull()
+    expect(stats.querySelector('[role="alert"]')).toBeNull()
+    expect(stats.querySelector('[aria-live]')).toBeNull()
+  })
+})

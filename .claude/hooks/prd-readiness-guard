@@ -1,0 +1,293 @@
+#!/usr/bin/env node
+'use strict';
+
+// Cross-platform Stop PRD readiness guard. Claude Code invokes this in exec form
+// (`node .claude/hooks/prd-readiness-guard`), so it runs identically on macOS, Linux, and
+// Windows without a POSIX shell. Project dir comes from CLAUDE_PROJECT_DIR env / argv[2] /
+// cwd (see resolveProjectDir). The hook event payload arrives as JSON on stdin (unused here).
+const fs = require('node:fs');
+const path = require('node:path');
+const { spawnSync } = require('node:child_process');
+
+const projectDir = resolveProjectDir();
+const finalizeScript = path.join(
+  projectDir,
+  '.claude',
+  'spec-first',
+  'workflows',
+  'spec-prd',
+  'scripts',
+  'finalize-prd-artifact.js',
+);
+
+const prdScan = changedPrdArtifacts(projectDir);
+if (prdScan.error) {
+  block([
+    '[spec-first] PRD readiness guard blocked closeout.',
+    'Could not inspect changed PRD artifacts under docs/brainstorms.',
+    `reason_codes: ${prdScan.error.reasonCode}`,
+    '',
+    'Next action: rerun from a valid git worktree or fix git status before closing out ready/final PRD work.',
+  ].join('\n'));
+}
+
+const prdPaths = prdScan.paths;
+if (prdPaths.length === 0) {
+  process.exit(0);
+}
+
+if (!fs.existsSync(finalizeScript)) {
+  block([
+    '[spec-first] PRD readiness guard blocked closeout.',
+    `Missing managed spec-prd finalize script: ${path.relative(projectDir, finalizeScript)}`,
+    'Run `spec-first init` to refresh Claude runtime assets, then rerun `spec-prd` finalize.',
+  ].join('\n'));
+}
+
+const blocked = [];
+for (const relativePrdPath of prdPaths) {
+  const absolutePrdPath = path.join(projectDir, relativePrdPath);
+  const inputs = extractSourceInputs(absolutePrdPath)
+    .map((inputPath) => (path.isAbsolute(inputPath) ? inputPath : path.join(projectDir, inputPath)));
+  const args = [finalizeScript, absolutePrdPath, '--check-only'];
+  if (inputs.length > 0) {
+    args.push('--inputs', inputs.join(','));
+  }
+
+  const result = spawnSync(process.execPath, args, {
+    cwd: projectDir,
+    encoding: 'utf8',
+    timeout: 5000,
+  });
+
+  if (result.status === 0) {
+    continue;
+  }
+
+  // timeout:spawnSync 超时返回 status===null + signal==='SIGTERM' + 空 stdout/stderr。
+  // 与真实 readiness gap(exit 1 + stdout JSON)区分,给 agent 可定位的 reason_code。
+  if (result.status === null || (result.signal && result.signal !== null)) {
+    blocked.push({
+      path: relativePrdPath,
+      reasonCodes: ['finalize_check_timeout'],
+      stderr: 'finalize --check-only exceeded the 5000ms hook budget (likely large PRD or many --inputs); rerun the producer-local finalize path directly with a higher timeout or fewer inputs.',
+    });
+    continue;
+  }
+
+  const parsed = parseJsonObject(result.stdout);
+  const reasonCodes = Array.isArray(parsed.blocking_reason_codes)
+    ? parsed.blocking_reason_codes
+    : ['finalize_check_failed'];
+  blocked.push({
+    path: relativePrdPath,
+    reasonCodes,
+    stderr: String(result.stderr || '').trim(),
+  });
+}
+
+if (blocked.length > 0) {
+  const lines = [
+    '[spec-first] PRD readiness guard blocked closeout.',
+    'Changed PRD artifacts that claim ready/final cannot close out until `spec-prd` producer-local finalize passes.',
+    'Do not repair this by only changing enum values to `final-prd`, deleting detailed requirements, or treating checker reason_codes as the workflow.',
+    'Choose the correct path: ask the next load-bearing owner question, preserve a non-ready checkpoint with `next_owner_question`, revise the PRD while keeping source/design gaps visible, or finalize only after all load-bearing gaps are closed and original inputs were scanned.',
+    '',
+    ...blocked.flatMap((entry) => [
+      `- ${entry.path}`,
+      `  reason_codes: ${entry.reasonCodes.join(', ')}`,
+      entry.stderr ? `  stderr: ${entry.stderr}` : '',
+    ].filter(Boolean)),
+    '',
+    'Next action: return to `spec-prd`, fix the listed readiness/design/grill/finalize gaps, then run the producer-local finalize path again.',
+    'Phase 1 restore point if grill was skipped: (1) emit a run-local Decision Card (write_mode / highest_risk_gap / next_action / why planning will not invent WHAT); (2) emit the Requirement Analysis Gate map; (3) begin Requirements Grill on each load-bearing branch before re-finalizing.',
+    'Legal enum values: write_mode = checkpoint-prd | final-prd | ask-owner-first | route-out; can_enter_spec_plan = yes | no; clarification_evidence = asked-owner | source-proven-no-ask | headless-degraded-logged; preflight_sweep_closure = closed | degraded | blocked.',
+  ];
+  block(lines.join('\n'));
+}
+
+function changedPrdArtifacts(cwd) {
+  const result = spawnSync('git', ['status', '--porcelain', '-z', '--untracked-files=all', '--', 'docs/brainstorms'], {
+    cwd,
+    encoding: 'utf8',
+    timeout: 2000,
+  });
+  if (result.status !== 0 || typeof result.stdout !== 'string') {
+    // Non-Git parent workspaces (multi-repo requirement folders) have no git index.
+    // Treat as "no changed PRD artifacts" so ordinary non-PRD turns can close.
+    // Real PRD work should run inside a child git repo where status failures still block.
+    const stderr = String(result.stderr || (result.error && result.error.message) || '');
+    if (/not a git repository/i.test(stderr) && hasChildGitRepo(cwd)) {
+      return { paths: [], error: null };
+    }
+    return {
+      paths: [],
+      error: {
+        reasonCode: result.status === null || (result.signal && result.signal !== null)
+          ? 'git_status_timeout'
+          : 'git_status_unavailable',
+      },
+    };
+  }
+
+  const entries = result.stdout.split('\0').filter(Boolean);
+  const paths = [];
+  for (let i = 0; i < entries.length; i += 1) {
+    const entry = entries[i];
+    const status = entry.slice(0, 2);
+    const filePath = entry.slice(3);
+    if (status.includes('R') || status.includes('C')) {
+      i += 1;
+    }
+    if (/^docs\/brainstorms\/.+-requirements\.md$/.test(filePath)
+      && isReadyClaimPrdArtifact(path.join(cwd, filePath))) {
+      paths.push(filePath);
+    }
+  }
+  return {
+    paths: [...new Set(paths)].sort(),
+    error: null,
+  };
+}
+
+function hasChildGitRepo(cwd) {
+  try {
+    return fs.readdirSync(cwd, { withFileTypes: true }).some((entry) => {
+      if (!entry.isDirectory() || entry.isSymbolicLink()) return false;
+      try {
+        const marker = fs.lstatSync(path.join(cwd, entry.name, '.git'));
+        return marker.isDirectory() || marker.isFile();
+      } catch (_error) {
+        return false;
+      }
+    });
+  } catch (_error) {
+    return false;
+  }
+}
+
+// docs/brainstorms/*-requirements.md 同时承载 spec-brainstorm 的需求 brief 与
+// spec-prd 的 PRD-grade 需求,仅凭路径无法区分。Stop hook 只守 ready/final 出口:
+// 普通 draft/checkpoint PRD 不应在多会话共享 checkout 时阻断其他会话 closeout。
+function isReadyClaimPrdArtifact(absolutePath) {
+  let content;
+  try {
+    content = fs.readFileSync(absolutePath, 'utf8');
+  } catch {
+    return false;
+  }
+  if (!/^\s*artifact_kind:\s*prd-requirements\s*$/im.test(content)) {
+    return false;
+  }
+
+  return frontmatterFieldValue(content, 'status').toLowerCase() === 'ready-for-planning'
+    || hasFrontmatterMachineReceipt(content)
+    || /^\s*(?:-\s*)?write_mode:\s*final-prd\s*$/im.test(content)
+    || /^\s*(?:-\s*)?can_enter_spec_plan:\s*yes\s*$/im.test(content)
+    || /^\s*(?:-\s*)?readiness_outcome:\s*ready-for-planning\s*$/im.test(content);
+}
+
+function hasFrontmatterMachineReceipt(text) {
+  return [
+    'readiness_verified_by',
+    'readiness_verified_at',
+    'readiness_checker_schema',
+    'readiness_prd_hash',
+    'readiness_inputs_hash',
+  ].some((fieldName) => frontmatterFieldValue(text, fieldName) !== '');
+}
+
+function frontmatterFieldValue(text, fieldName) {
+  const lines = text.split(/\r?\n/);
+  if (lines[0] !== '---') {
+    return '';
+  }
+  const fmEnd = lines.findIndex((line, i) => i > 0 && line === '---');
+  if (fmEnd === -1) {
+    return '';
+  }
+  const pattern = new RegExp(`^\\s*${fieldName}:\\s*(.*)$`, 'i');
+  for (let i = 1; i < fmEnd; i += 1) {
+    const match = lines[i].match(pattern);
+    if (match) {
+      return match[1].trim();
+    }
+  }
+  return '';
+}
+
+function extractSourceInputs(prdPath) {
+  let text;
+  try {
+    text = fs.readFileSync(prdPath, 'utf8');
+  } catch {
+    return [];
+  }
+  const lines = text.split(/\r?\n/);
+  // 必须以 frontmatter 开头
+  if (lines[0] !== '---') {
+    return [];
+  }
+  // 找到 frontmatter 结束边界（第二个 ---），只在 frontmatter 内扫描，防止
+  // source_inputs 是最后一个 frontmatter 字段时正文 bullet 被误读为输入路径
+  const fmEnd = lines.findIndex((line, i) => i > 0 && line === '---');
+  if (fmEnd === -1) {
+    return [];
+  }
+  const fmLines = lines.slice(1, fmEnd);
+  const start = fmLines.findIndex((line) => /^(source_inputs|prd_input):\s*$/.test(line));
+  if (start === -1) {
+    return [];
+  }
+  const inputs = [];
+  for (let i = start + 1; i < fmLines.length; i += 1) {
+    const line = fmLines[i];
+    if (/^[A-Za-z0-9_-]+:\s*/.test(line)) {
+      break;
+    }
+    const match = line.match(/^\s*-\s+(.+?)\s*$/)
+      || line.match(/^\s*path:\s+(.+?)\s*$/);
+    if (match) {
+      const value = match[1]
+        .replace(/^path:\s*/, '')
+        .replace(/^["']|["']$/g, '')
+        .trim();
+      if (value) {
+        inputs.push(value);
+      }
+    }
+  }
+  return inputs;
+}
+
+// Exec form does not expand $CLAUDE_PROJECT_DIR, so prefer the env var Claude exports, then
+// a real argv[2] (reject the literal placeholder from a stale settings.json), then cwd
+// (Claude runs the hook with cwd = project root).
+function resolveProjectDir() {
+  const fromEnv = process.env.CLAUDE_PROJECT_DIR;
+  if (typeof fromEnv === 'string' && fromEnv.trim()) {
+    return fromEnv;
+  }
+  const fromArg = process.argv[2];
+  if (typeof fromArg === 'string' && fromArg.trim() && fromArg !== '$CLAUDE_PROJECT_DIR') {
+    return fromArg;
+  }
+  return process.cwd();
+}
+
+function block(reason) {
+  process.stdout.write(JSON.stringify({
+    decision: 'block',
+    reason,
+  }));
+  process.exit(0);
+}
+
+function parseJsonObject(raw) {
+  try {
+    const parsed = JSON.parse(raw || '{}');
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}

@@ -1,0 +1,688 @@
+<title>验证待办清单</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@0,400;0,500;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --ground: #f5f7fa;
+    --surface: #ffffff;
+    --surface-sunk: #eef1f6;
+    --ink: #191d26;
+    --ink-mid: #4d5666;
+    --ink-dim: #77808f;
+    --line: #dde2ea;
+    --line-strong: #c6cddb;
+    --accent: #2a63c4;
+    --ok: #1c7355;
+    --act: #8f5510;
+    --gap: #a3342f;
+    --ok-wash: #e8f3ee;
+    --act-wash: #fbf1e2;
+    --gap-wash: #fbeceb;
+    --sans: 'IBM Plex Sans', system-ui, sans-serif;
+    --serif: 'IBM Plex Serif', Georgia, serif;
+    --mono: 'IBM Plex Mono', Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #14171d;
+      --surface: #1b1f27;
+      --surface-sunk: #21262f;
+      --ink: #e8ebf1;
+      --ink-mid: #a8b0bf;
+      --ink-dim: #7d8695;
+      --line: #2c323c;
+      --line-strong: #3c434f;
+      --accent: #7aa7ee;
+      --ok: #5fbe97;
+      --act: #d9a75a;
+      --gap: #e58a84;
+      --ok-wash: #16302a;
+      --act-wash: #322614;
+      --gap-wash: #331e1d;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #14171d;
+    --surface: #1b1f27;
+    --surface-sunk: #21262f;
+    --ink: #e8ebf1;
+    --ink-mid: #a8b0bf;
+    --ink-dim: #7d8695;
+    --line: #2c323c;
+    --line-strong: #3c434f;
+    --accent: #7aa7ee;
+    --ok: #5fbe97;
+    --act: #d9a75a;
+    --gap: #e58a84;
+    --ok-wash: #16302a;
+    --act-wash: #322614;
+    --gap-wash: #331e1d;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 16px;
+    line-height: 1.65;
+  }
+
+  .sheet {
+    max-width: 60rem;
+    margin: 0 auto;
+    padding: 3rem 1.5rem 5rem;
+  }
+
+  /* ── 页眉 ── */
+
+  .eyebrow {
+    font-family: var(--sans);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    margin: 0 0 0.6rem;
+  }
+
+  h1 {
+    font-family: var(--sans);
+    font-size: clamp(1.7rem, 4vw, 2.3rem);
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+    margin: 0 0 0.75rem;
+  }
+
+  .lede {
+    max-width: 40rem;
+    margin: 0;
+    color: var(--ink-mid);
+  }
+
+  .lede strong { color: var(--ink); font-weight: 500; }
+
+  /* ── 计数带 ── */
+
+  .tally {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+    gap: 1px;
+    margin: 2.5rem 0 3rem;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .tally__cell {
+    background: var(--surface);
+    padding: 0.95rem 1.1rem;
+  }
+
+  .tally__n {
+    font-family: var(--sans);
+    font-size: 1.6rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+    display: block;
+  }
+
+  .tally__k {
+    font-family: var(--sans);
+    font-size: 0.78rem;
+    color: var(--ink-dim);
+  }
+
+  .tally__cell--ok .tally__n { color: var(--ok); }
+  .tally__cell--act .tally__n { color: var(--act); }
+  .tally__cell--gap .tally__n { color: var(--gap); }
+
+  /* ── 警示 ── */
+
+  .alert {
+    border: 1px solid var(--gap);
+    border-left-width: 4px;
+    background: var(--gap-wash);
+    border-radius: 3px;
+    padding: 1.1rem 1.3rem;
+    margin: 0 0 3rem;
+  }
+
+  .alert h2 {
+    font-family: var(--sans);
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gap);
+    margin: 0 0 0.4rem;
+  }
+
+  .alert p { margin: 0 0 0.5rem; }
+  .alert p:last-child { margin-bottom: 0; }
+
+  /* ── 分组 ── */
+
+  .group { margin: 0 0 3.5rem; }
+
+  .group__head {
+    border-bottom: 2px solid var(--line-strong);
+    padding-bottom: 0.7rem;
+    margin-bottom: 0.4rem;
+  }
+
+  .group__head h2 {
+    font-family: var(--sans);
+    font-size: 1.15rem;
+    font-weight: 600;
+    margin: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+  }
+
+  .group__tag {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    padding: 0.12rem 0.45rem;
+    border-radius: 2px;
+  }
+
+  .group--act .group__tag { background: var(--act-wash); color: var(--act); }
+  .group--gap .group__tag { background: var(--gap-wash); color: var(--gap); }
+  .group--ok .group__tag { background: var(--ok-wash); color: var(--ok); }
+
+  .group__why {
+    font-size: 0.9rem;
+    color: var(--ink-mid);
+    margin: 0.7rem 0 1.6rem;
+    max-width: 42rem;
+  }
+
+  /* ── 条目 ── */
+
+  .item {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--line-strong);
+    border-radius: 3px;
+    padding: 1.15rem 1.3rem;
+    margin-bottom: 0.85rem;
+  }
+
+  .group--act .item { border-left-color: var(--act); }
+  .group--gap .item { border-left-color: var(--gap); }
+
+  .item__head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.7rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.7rem;
+  }
+
+  .unit {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--accent);
+    background: var(--surface-sunk);
+    padding: 0.15rem 0.42rem;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+
+  .item__title {
+    font-family: var(--sans);
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0;
+    flex: 1 1 20rem;
+  }
+
+  .field {
+    display: grid;
+    grid-template-columns: 5.5rem 1fr;
+    gap: 0.35rem 0.9rem;
+    font-size: 0.92rem;
+    margin-bottom: 0.45rem;
+  }
+
+  .field:last-of-type { margin-bottom: 0; }
+
+  .field__k {
+    font-family: var(--sans);
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0.03em;
+    color: var(--ink-dim);
+    padding-top: 0.22rem;
+  }
+
+  .field__v { margin: 0; color: var(--ink-mid); }
+  .field__v strong { color: var(--ink); font-weight: 500; }
+
+  @media (max-width: 34rem) {
+    .field { grid-template-columns: 1fr; gap: 0.1rem; }
+    .field__k { padding-top: 0.5rem; }
+  }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.86em;
+    background: var(--surface-sunk);
+    padding: 0.1em 0.34em;
+    border-radius: 2px;
+    color: var(--ink);
+  }
+
+  pre {
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    line-height: 1.6;
+    background: var(--surface-sunk);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 0.8rem 0.95rem;
+    margin: 0.5rem 0 0;
+    overflow-x: auto;
+  }
+
+  pre code { background: none; padding: 0; font-size: 1em; }
+
+  .pass {
+    font-family: var(--sans);
+    font-size: 0.8rem;
+    color: var(--ok);
+    font-weight: 500;
+  }
+
+  /* ── 已验证表 ── */
+
+  .done-wrap { overflow-x: auto; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--sans);
+    font-size: 0.88rem;
+  }
+
+  th, td {
+    text-align: left;
+    padding: 0.55rem 0.8rem;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+
+  th {
+    font-size: 0.74rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    border-bottom: 2px solid var(--line-strong);
+    white-space: nowrap;
+  }
+
+  td:first-child { font-family: var(--mono); font-size: 0.8rem; color: var(--accent); white-space: nowrap; }
+  td.ev { font-family: var(--mono); font-size: 0.76rem; color: var(--ink-dim); }
+
+  footer {
+    border-top: 1px solid var(--line);
+    margin-top: 3.5rem;
+    padding-top: 1.5rem;
+    font-size: 0.88rem;
+    color: var(--ink-mid);
+  }
+
+  footer h2 {
+    font-family: var(--sans);
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--ink);
+    margin: 0 0 0.5rem;
+  }
+
+  footer p { margin: 0 0 0.6rem; max-width: 42rem; }
+  footer p:last-child { margin-bottom: 0; }
+
+  a { color: var(--accent); }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+<div class="sheet">
+
+  <p class="eyebrow">CodePilot-Agent · 2026-08-25</p>
+  <h1>验证待办清单</h1>
+  <p class="lede">
+    15 个实现单元的代码与测试已全部交付，<strong>700 个后端测试 + 53 个前端测试通过</strong>，
+    mypy 与 tsc 无错误。<strong>报告端到端已在 fastapi/fastapi 上实跑通</strong>（26 条结论 / 73 条引用零无效），
+    这是此前清单里最实质的缺口。本清单记三件事：哪些验证已落地、哪些还没做<strong>及为什么</strong>、
+    以及端到端跑通后暴露的待评估问题。每条给出计划的原文要求、当前证据、以及能直接执行的命令。
+  </p>
+
+  <div class="tally">
+    <div class="tally__cell tally__cell--ok">
+      <span class="tally__n">14</span>
+      <span class="tally__k">实跑已验证</span>
+    </div>
+    <div class="tally__cell tally__cell--act">
+      <span class="tally__n">2</span>
+      <span class="tally__k">需你操作</span>
+    </div>
+    <div class="tally__cell tally__cell--act">
+      <span class="tally__n">2</span>
+      <span class="tally__k">口述已完成，无证据文件</span>
+    </div>
+    <div class="tally__cell tally__cell--gap">
+      <span class="tally__n">3</span>
+      <span class="tally__k">实跑暴露的待评估问题</span>
+    </div>
+  </div>
+
+  <div class="alert">
+    <h2>本轮抓到的实现缺陷：mcp 依赖开区间</h2>
+    <p>
+      照 README 在全新环境走一遍时暴露：<code>pyproject.toml</code> 原写 <code>mcp&gt;=1.27</code>（无上界）。
+      本机装的是 1.27.0，而<strong>今天全新安装解析到 2.1.0</strong>，而 mcp 2.x 已移除
+      <code>mcp.server.fastmcp</code> —— 于是 MCP server 与它的 10 个测试直接 ImportError。
+      本机环境永远看不出这一点。
+    </p>
+    <p>
+      已修为 <code>mcp&gt;=1.27,&lt;2</code> 并写明理由。修正后全新环境解析到 1.29.1，700 个测试全绿；
+      容器内同样生效。这与 <code>Brotli</code> 那条注释记录的是同一类问题的下一个实例。
+      证据：<code>2026-08-25-u15-fresh-clone-readme.txt</code>
+    </p>
+  </div>
+
+  <div class="alert" style="border-color:var(--line-strong);background:var(--surface-sunk)">
+    <h2 style="color:var(--ink)">两个 API key 的处置：你已决定不轮换</h2>
+    <p>
+      此前验证 compose 配置时，<code>docker compose config</code> 把 <code>DEEPSEEK_API_KEY</code> 与
+      <code>EMBEDDING_API_KEY</code> 的明文打印进了会话输出。你已说明这是第三方聚合站的测试 key，
+      不需要轮换，风险由你接受。此条保留为记录。
+    </p>
+    <p>
+      本轮重新核对 compose 配置时刻意避开了那个动作：只提取结构（services、卷挂载目标、端口、
+      environment 的<strong>键名</strong>），全程不打印任何变量值。README 里的运维警示保留。
+    </p>
+  </div>
+
+  <section class="group group--act">
+    <div class="group__head">
+      <h2><span class="group__tag">需你操作</span>只能在你的机器上完成</h2>
+    </div>
+    <p class="group__why">
+      这两项需要真实 MCP 客户端界面或人工操作 —— 我没有这些访问能力。
+      其余原属此类的条目（浏览器流程、容器构建与启动、镜像查 key、README 走通）本轮已由我实跑完成，
+      见下方「已验证」表。
+    </p>
+
+    <div class="item">
+      <div class="item__head">
+        <span class="unit">U14</span>
+        <h3 class="item__title">在 Claude Code 或 Cursor 里实际连接</h3>
+      </div>
+      <div class="field">
+        <span class="field__k">计划要求</span>
+        <p class="field__v">在真实客户端中配置连接，实际调用至少两个工具并拿到结果（R20）。</p>
+      </div>
+      <div class="field">
+        <span class="field__k">当前证据</span>
+        <p class="field__v">用标准 <code>mcp</code> 客户端库走完了同一条 stdio 协议路径：握手成功、7 个工具 schema 完整、6 个工具实际返回结果、逃逸路径被拒。<strong>你口述已在真实客户端连过，但没有输出文件留档</strong>。</p>
+      </div>
+      <div class="field">
+        <span class="field__k">怎么做</span>
+        <div class="field__v">
+          <p style="margin:0 0 0.4rem">配置方法见 <code>backend/mcp_server/README.md</code>。先通过界面或 API 提交一次分析，工具读的是已分析仓库的本地数据。</p>
+          <pre><code>curl -X POST http://localhost:8000/api/analyses \
+  -H 'Content-Type: application/json' \
+  -d '{"repo_url": "https://github.com/fastapi/fastapi"}'</code></pre>
+          <p style="margin:0.5rem 0 0">留档只需把客户端里的调用与返回截图或贴文存进 <code>docs/</code>。</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="item">
+      <div class="item__head">
+        <span class="unit">U14</span>
+        <h3 class="item__title">用 MCP Inspector 核对 schema</h3>
+      </div>
+      <div class="field">
+        <span class="field__k">计划要求</span>
+        <p class="field__v"><code>mcp dev</code> 启动后用 MCP Inspector 核对工具 schema。</p>
+      </div>
+      <div class="field">
+        <span class="field__k">当前证据</span>
+        <p class="field__v">程序化断言了 7 个工具的描述与全部参数说明非空（此前踩过一次：docstring 的 <code>Args:</code> 段不进 schema，改用了 <code>Annotated</code> + <code>Field</code>）。<strong>Inspector 界面未看过</strong>；它是浏览器 UI，需要你的桌面会话。</p>
+      </div>
+      <div class="field">
+        <span class="field__k">怎么做</span>
+        <div class="field__v">
+          <pre><code>mcp dev backend/mcp_server/server.py</code></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="group group--act">
+    <div class="group__head">
+      <h2><span class="group__tag">口述已完成</span>状态已更新，但无输出文件</h2>
+    </div>
+    <p class="group__why">
+      你说明这两项已在你机器上跑通，本清单按你的口述更新状态。<strong>证据强度与其它已验证项不同</strong>：
+      docs/ 下没有对应的输出文件，所以无法复核当次运行的实际结果。这一点显式记在此处而非悄悄合并进已验证表。
+    </p>
+
+    <div class="item">
+      <div class="item__head">
+        <span class="unit">U13</span>
+        <h3 class="item__title">浏览器里走通含真实分析的完整流程</h3>
+      </div>
+      <div class="field">
+        <span class="field__k">口述状态</span>
+        <p class="field__v">已完成。</p>
+      </div>
+      <div class="field">
+        <span class="field__k">我这侧的独立证据</span>
+        <p class="field__v">本轮已用真实 Chromium 核对渲染、响应式与可访问性契约（见已验证表 U13 行），但那一轮的 API 用固件拦截，<strong>不含真实 SSE 长连接</strong>。真实分析这侧已跑通（见 U8 行），两半各自成立但没在同一次操作里合起来走 —— 即「浏览器里盯着一次真实的 36 分钟分析从提交走到报告」这一条仍只有你的口述。</p>
+      </div>
+    </div>
+
+    <div class="item">
+      <div class="item__head">
+        <span class="unit">U15</span>
+        <h3 class="item__title">容器重启后索引缓存仍在</h3>
+      </div>
+      <div class="field">
+        <span class="field__k">计划要求</span>
+        <p class="field__v">容器重启后索引缓存保留，不重建（R4、AE3）。</p>
+      </div>
+      <div class="field">
+        <span class="field__k">口述状态</span>
+        <p class="field__v">已完成。</p>
+      </div>
+      <div class="field">
+        <span class="field__k">我这侧的独立证据</span>
+        <p class="field__v">缓存机制本身已实跑验证（二次运行 <strong>0 次 embedding 调用</strong>，加速比 6094×）。卷挂载点与缓存落盘路径已核对：容器内 <code>WORKSPACE_ROOT=/data</code>，<code>/data</code> 挂在独立设备上。<strong>缺的只是容器重启这一段的实测</strong> —— 它需要先在容器内跑一次完整分析产出索引，而那会重复一整轮真实费用。</p>
+      </div>
+      <div class="field">
+        <span class="field__k">怎么留档</span>
+        <div class="field__v">
+          <pre><code>docker compose restart backend
+# 重新提交同一仓库，进度应快速推进到完成
+# 后端日志里那行应写「命中已有索引」</code></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="group group--ok">
+    <div class="group__head">
+      <h2><span class="group__tag">已验证</span>实跑证据在 docs/ 下</h2>
+    </div>
+    <p class="group__why">
+      这些是已在真实仓库（fastapi/fastapi 与 ghostfolio/ghostfolio）上跑过并留下证据的验证项。
+      每份证据文件都记录了当次运行的完整输出。<strong>加粗的四行是本轮新增。</strong>
+    </p>
+
+    <div class="done-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>单元</th>
+            <th>验证内容</th>
+            <th>关键结果</th>
+            <th>证据</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>U3 · U4</td>
+            <td>静态解析层与模块聚类经人工核对（Goal Capsule 的停止条件）</td>
+            <td>fastapi 1138 文件 / 203 模块；ghostfolio 864 / 264；聚类分组已确认吻合作者意图</td>
+            <td class="ev">u3u4-benchmark-skeleton.txt</td>
+          </tr>
+          <tr>
+            <td>U6</td>
+            <td>深挖列表覆盖人工判断的核心模块</td>
+            <td>正确剔除了 <code>interfaces</code>、<code>types</code>、<code>dtos</code> 等语义空洞模块</td>
+            <td class="ev">u6-planner-benchmark.txt</td>
+          </tr>
+          <tr>
+            <td>U7</td>
+            <td>并行扇出完成，引用路径真实存在，trace 可见工具调用序列</td>
+            <td>6 个模块全部完成，零退化，<strong>零幻觉路径</strong></td>
+            <td class="ev">u7-fanout-benchmark.txt</td>
+          </tr>
+          <tr>
+            <td>U9</td>
+            <td>首次索引落盘、二次秒级返回、检索抽查</td>
+            <td>二次运行 <strong>0 次 embedding 调用</strong>，加速比 6094×</td>
+            <td class="ev">u9-index-benchmark.txt</td>
+          </tr>
+          <tr>
+            <td>U10</td>
+            <td>三个已知答案的问题引用可核验；不存在的问题返回未找到</td>
+            <td>7 题 6 符合预期，9 条引用全部核验通过；AE5 端到端成立</td>
+            <td class="ev">u10-qa-benchmark.txt</td>
+          </tr>
+          <tr>
+            <td>U11</td>
+            <td>结构类发现经人工核对为真问题；误报率抽查</td>
+            <td>报出 5 条全对，压掉 3 条全对（逐条核对源码）</td>
+            <td class="ev">u11-review-benchmark.txt</td>
+          </tr>
+          <tr>
+            <td><strong>U2</strong></td>
+            <td><strong>补齐两项缺失的测试：克隆结果级逃逸、克隆场景</strong></td>
+            <td>新增 7 个测试（4 + 3）；<strong>变异验证确认咬住校验点</strong>（删掉逐条校验后 2 条转红）；子模块目录为空首次被观察到</td>
+            <td class="ev">2026-08-25-u2-clone-tests.txt</td>
+          </tr>
+          <tr>
+            <td><strong>U13</strong></td>
+            <td><strong>真实浏览器下的渲染、响应式与可访问性契约</strong></td>
+            <td>1440px 与 <strong>375px 均无横向溢出</strong>；完成态三区块共存；播报角色数量未增加；界面改版后 53 个前端测试全绿</td>
+            <td class="ev">2026-08-25-u13-browser-ui.txt</td>
+          </tr>
+          <tr>
+            <td><strong>U15</strong></td>
+            <td><strong>容器构建、启动、镜像内无 API key</strong></td>
+            <td>后端 1.02GB / 前端 92.9MB 均构建成功；nginx 内部代理 <code>/api</code> 通；<strong>镜像层 0 处密钥，运行时 env_file 注入生效</strong></td>
+            <td class="ev">2026-08-25-u15-container.txt</td>
+          </tr>
+          <tr>
+            <td><strong>U15</strong></td>
+            <td><strong>README 的本地启动步骤经全新环境实际走通</strong></td>
+            <td><strong>抓到 mcp 依赖开区间缺陷并修正</strong>；<code>Brotli</code> 未装齐的担心可消除；全新环境 700 测试 + 53 前端测试全绿，健康检查 200</td>
+            <td class="ev">2026-08-25-u15-fresh-clone-readme.txt</td>
+          </tr>
+          <tr>
+            <td><strong>U8 · U7</strong></td>
+            <td><strong>报告端到端实跑；抽查 5 条结论核对支撑证据</strong></td>
+            <td>26 条结论 / 73 条引用，<strong>0 条无引用、0 条路径不存在、0 条行号越界</strong>；抽查 5 条逐条读源码全部成立；12 路扇出零退化；U7 两处修正未复现修正前症状</td>
+            <td class="ev">2026-08-25-u8-report-e2e.txt</td>
+          </tr>
+          <tr>
+            <td><strong>U9</strong></td>
+            <td><strong>全量索引（此前只有抽样）</strong></td>
+            <td>1138 个可解析文件 → <strong>6529 个切块</strong>，105 批 embedding；抽样导致「找不到」那条限制随之解除</td>
+            <td class="ev">2026-08-25-u8-report-e2e.txt</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="item" style="margin-top:2rem">
+      <div class="item__head">
+        <span class="unit">发现</span>
+        <h3 class="item__title">端到端实跑暴露的三件事（均未修，各自独立评估）</h3>
+      </div>
+      <div class="field">
+        <span class="field__k">一｜循环依赖误报：函数内延迟导入被算成图边</span>
+        <p class="field__v">
+          评审报出 <code>_compat/v2.py → params.py → datastructures.py → _compat/v2.py</code> 的环，
+          但逐边核对后：3 条边有 2 条是<strong>函数作用域的延迟导入</strong>（<code>v2.py:350</code>、
+          <code>datastructures.py:148</code>），只有 <code>params.py:16</code> 是顶层导入。
+          <strong>导入期不存在这个环</strong> —— 作者正是用延迟导入打破它的。
+          而报告「依赖关系」一节反而正确地把同一处延迟导入描述为「主动规避循环依赖的例证」，
+          两处口径互相矛盾：模块子 Agent 读了源码看出是规避手段，评审只看图。
+          依赖图不区分「导入期依赖」与「调用期依赖」，这是一类可复现的误报。
+          影响 U4 的图、U6 的深挖列表、U11 的结构类检查，改动面大，故未动。
+        </p>
+      </div>
+      <div class="field">
+        <span class="field__k">二｜「完整分析」与「U9 仍抽样」不可兼得（与 D3 口径有出入）</span>
+        <p class="field__v">
+          <code>real_nodes.py:218</code> 传给 <code>build_index</code> 的是 <code>[f.path for f in outcome.parsed]</code> ——
+          全量 parsed 文件，代码里没有抽样开关。所以你授权的一次完整分析<strong>必然连带做全量索引</strong>。
+          本次实际 1138 个可解析文件 → <strong>6529 个切块 / 105 批 embedding</strong>。
+          上次基准记录的「只索引前 60 个文件」是当次跑法的限制，不是代码行为。
+          正面副作用：U9「抽样导致部分查询找不到」那条限制随之解除，检索质量现在可被真实评估。
+        </p>
+      </div>
+      <div class="field">
+        <span class="field__k">三｜三条分支不是真并行，索引占了 83% 的墙钟时间</span>
+        <p class="field__v">
+          <code>builder.py</code> 的注释图把 Planner / Reviewer / 索引画成三路并行，但 LangGraph 的
+          superstep 语义下 <code>planner</code>、<code>select_files</code>、<code>chunk_and_index</code> 同属一个 superstep，
+          <strong>下一个 superstep（模块扇出、Reviewer）必须等整个当前 superstep 结束才启动</strong>。
+          实测：总跨度 <strong>36.6 分钟</strong>，其中索引段 <strong>30.5 分钟</strong>（105 批 embedding），
+          扇出+评审+汇总只用 <strong>5.3 分钟</strong>（45 次 chat）。索引跑完前 chat 调用一直停在 2 次。
+          即用户提交后要等 30 分钟才开始有模块分析；若三者真并行，总耗时应约 30.5 分钟而非 36.6。
+          这条影响「首次分析要等多久」这个用户可感知的量，值得单独评估是否要改。
+        </p>
+      </div>
+      <div class="field">
+        <span class="field__k">还剩什么</span>
+        <p class="field__v">
+          计划要求「<strong>两个</strong>基准仓库的报告经人工抽查」，本次只跑了 fastapi 一个。
+          跑 ghostfolio 会再产生一整轮真实费用，需你另行决定。
+          索引缓存已落盘，重跑同一仓库会命中缓存，只付扇出与汇总的成本。
+        </p>
+      </div>
+    </div>
+  </section>
+
+
+  <footer>
+    <h2>怎么记录结果</h2>
+    <p>
+      跑完一项后，把输出存进 <code>docs/</code> 并沿用现有命名（<code>YYYY-MM-DD-uNN-描述.txt</code>），
+      然后把本文件里对应条目移进「已验证」表。这样验证状态与证据始终在一处。
+    </p>
+    <p>
+      本轮之后剩下三类：<strong>需你操作</strong>的两项都在 U14，只差真实客户端界面的留档，
+      协议路径本身已被程序化覆盖；<strong>口述已完成</strong>的两项状态已更新，但证据强度弱于其余条目，
+      要补强就按各自的「怎么留档」跑一遍并存输出；<strong>实跑暴露的三个待评估问题</strong>
+      （循环依赖误报、全量索引不可关、索引串在扇出之前）都不是本清单意义上的「验证缺口」，
+      而是端到端跑通之后才看得见的实现问题 —— 各自影响面不同，建议分开评估而非一起改。
+    </p>
+  </footer>
+</div>

@@ -1,0 +1,65 @@
+端点拒绝 response_format（BadRequestError），去掉该参数重试
+端点拒绝 response_format（BadRequestError），去掉该参数重试
+
+============================================================================
+fastapi__fastapi（203 个模块，扇出上限 12）
+============================================================================
+
+--- 纯规则 top 12 ---
+   1. 0.6830  fastapi#1                                                 21 文件
+   2. 0.4916  tests                                                    213 文件
+   3. 0.0825  fastapi/_compat                                            3 文件
+   4. 0.0688  docs_src/dependencies                                     32 文件
+   5. 0.0660  docs_src/query_params_str_validations                     31 文件
+   6. 0.0387  fastapi/openapi                                            5 文件
+   7. 0.0379  fastapi/security                                           7 文件
+   8. 0.0352  docs_src/custom_response                                  16 文件
+   9. 0.0352  tests/test_tutorial/test_query_params_str_validations     17 文件
+  10. 0.0347  scripts                                                   12 文件
+  11. 0.0323  docs_src/python_types                                     14 文件
+  12. 0.0308  docs_src/security                                         15 文件
+
+--- Planner 决定 ---
+  按依赖图中心度（65%）与模块规模（35%）对 203 个模块排序，取前 24 个交模型做语义取舍，最终选定 7 个（扇出上限 12）。剔除 17 个语义空洞模块：docs_src/dependencies（纯文档教程示例代码，内部无耦合(internal_edges=0)，仅用于文档演示依赖注入用法，无架构洞察价值。）；docs_src/query_params_str_validations（文档教程示例集合，重复展示查询参数校验用法，非实际业务逻辑，语义空洞。）；docs_src/custom_response（文档教程示例，展示自定义响应用法，无内部依赖，仅用于说明用途，非核心实现。）；tests/test_tutorial/test_query_params_str_validations（针对文档教程示例的测试集，验证的是docs_src内容而非核心库逻辑，架构价值有限。）；docs_src/python_types（纯Python类型使用教学示例，零外部/内部耦合，与框架架构无关，语义空洞。）。选定数少于上限，因候选集内有 17 个被判为不值得深挖；未扩大候选范围——排序更后的模块得分更低，语义价值不会更高。
+
+  [ 1][deep    ] fastapi#1                                    核心框架模块：应用入口、请求/响应处理、异常处理、依赖注入等核心逻辑所在，是理解FastAPI架构的关键。
+  [ 2][standard] tests                                        主测试套件，覆盖大量功能点，内部高度松散但外部依赖极广，可辅助验证核心模块行为，但本身非业务逻辑，标准深度即可。
+  [ 3][deep    ] fastapi/_compat                              兼容层(shared.py/v2.py)处理pydantic v1/v2版本差异，是框架跨版本兼容的关键架构决策点，值得深入。
+  [ 4][deep    ] fastapi/openapi                              负责OpenAPI schema生成与文档渲染(utils.py/models.py/docs.py)，是框架自动文档能力的核心实现。
+  [ 5][deep    ] fastapi/security                             实现OAuth2/API Key/HTTP等认证方案，是框架安全机制的核心业务逻辑所在。
+  [ 6][standard] scripts                                      项目维护与发布自动化脚本(文档构建、翻译、发版等)，可反映工程流程但非核心业务逻辑。
+  [ 7][standard] fastapi/middleware                           封装CORS/GZip/TrustedHost等中间件，属于对Starlette中间件的薄封装，有一定实现但非核心业务逻辑。
+
+============================================================================
+ghostfolio__ghostfolio（264 个模块，扇出上限 12）
+============================================================================
+
+--- 纯规则 top 12 ---
+   1. 0.9425  libs/common/src/lib/interfaces                            51 文件
+   2. 0.8600  libs/common/src/lib/types                                 31 文件
+   3. 0.4535  libs/common/src/lib/interfaces/responses                  41 文件
+   4. 0.3291  libs/common/src/lib#1                                      9 文件
+   5. 0.3084  libs/common/src/lib/dtos                                  32 文件
+   6. 0.2263  apps/api/src/app/{portfolio,redis-cache}                  26 文件
+   7. 0.1190  apps/api/src/app/portfolio                                14 文件
+   8. 0.1091  apps/api/src/helper                                       12 文件
+   9. 0.1006  apps/client/src/app/components/footer+apps/client/src/ap   4 文件
+  10. 0.0904  apps/api/src/{app,services} [user.controller.ts]           5 文件
+  11. 0.0796  apps/client/src/app/{components,services}                  8 文件
+  12. 0.0742  apps/api/src/{interceptors,services}                       4 文件
+
+--- Planner 决定 ---
+  按依赖图中心度（65%）与模块规模（35%）对 264 个模块排序，取前 24 个交模型做语义取舍，最终选定 12 个（扇出上限 12）。剔除 5 个语义空洞模块：libs/common/src/lib/interfaces（纯接口声明集合（access/account/admin/activity 等数据形状定义），被广泛引用致中心度高，但无业务逻辑可深挖。）；libs/common/src/lib/types（全是 TypeScript 类型别名定义（如 date-range、granularity 等），属于类型词汇表，语义空洞。）；libs/common/src/lib/interfaces/responses（API 响应体的接口声明集合，仅描述数据结构，无实现逻辑，深挖价值低。）；libs/common/src/lib/dtos（DTO 类定义（create-account、create-order 等），主要承载数据传输结构与校验注解，缺乏独立业务逻辑，语义偏空洞。）；libs/common/src/lib/enums（仅为枚举常量定义（confirmation-dialog、subscription-type），语义空洞，无逻辑可分析。）。
+
+  [ 1][deep    ] libs/common/src/lib#1                        包含 calculation-helper、chart-helper、personal-finance-tools、permissions 
+  [ 2][deep    ] apps/api/src/app/{portfolio,redis-cache}     大量 portfolio-calculator 场景测试（buy/sell/short/cash 等），揭示投资组合收益计算的核心业务规则，
+  [ 3][deep    ] apps/api/src/app/portfolio                   组合服务与控制器（current-rate、portfolio.service），是投资组合功能的主要业务入口。
+  [ 4][standard] apps/api/src/helper                          跨领域辅助函数集合（account/activity/sector/redis 等 helper），承担多处复用的工具逻辑，但非核心业务算法
+  [ 5][standard] apps/client/src/app/components/footer+apps/c 应用根组件、路由表与页脚组件，决定前端整体导航结构，属于骨架层代码。
+  [ 6][deep    ] apps/api/src/{app,services} [user.controller 用户模块与 Prisma 服务耦合在一起，涉及用户数据管理与数据库访问的核心路径。
+  [ 7][standard] apps/client/src/app/{components,services}    客户端多个基础服务（缓存、模拟登录、令牌存储、WebAuthn），是前端状态与认证支撑层。
+  [ 8][standard] apps/api/src/{interceptors,services}         请求拦截器与配置服务，涉及跨数据源请求转换逻辑，属于基础设施层但有一定实现细节。
+  [ 9][deep    ] apps/api/src/services/{cron,property,queues} 定时任务、属性服务与数据采集队列处理器，是后台数据同步与调度的核心业务流程。
+  [10][deep    ] apps/api/src/app/auth                        包含多种认证策略（JWT、Google、OIDC、API Key）与鉴权服务，是安全体系的核心实现。
+  [11][standard] apps/api/src/decorators                      权限与作用域相关的自定义装饰器，涉及访问控制逻辑，但规模较小，判定为常规深度。
+  [12][standard] libs/ui/src/lib/services                     UI 层的 admin/data 服务，承担前端与后端交互的核心数据获取逻辑。

@@ -1,0 +1,123 @@
+U15 验证：容器构建、启动、镜像内无 API key
+日期：2026-08-25
+环境：Docker Desktop 29.7.2（linux 引擎），Docker Compose v5.4.0
+
+────────────────────────────────────────────────────────────────────
+一、镜像构建（此前未验证）
+────────────────────────────────────────────────────────────────────
+
+结果
+  codepilot-agent-backend:latest   1.02GB
+  codepilot-agent-frontend:latest  92.9MB
+  两个镜像均构建成功。
+
+backlog 列出的三处不确定，逐条落地
+  基础镜像 tag 可用性
+    python:3.13-slim / node:24-alpine / nginx:1.29-alpine 全部存在且可拉取。
+  npm ci 在 alpine 上是否需要额外依赖
+    不需要。frontend 构建阶段在 node:24-alpine 上直接完成，无额外 apk 安装。
+  chromadb 的 rust 绑定在 slim 镜像上是否需要更多运行库
+    需要 build-essential，而 Dockerfile 的 builder 阶段已经装了。
+    实测 pip 全部装成 wheel，未触发源码编译：
+      chromadb-1.5.9、onnxruntime-1.29.0、grpcio-1.83.0、tokenizers-0.23.1
+      numpy-2.5.2、protobuf-7.36.0 等均为预编译 wheel
+    运行阶段（第二个 FROM python:3.13-slim）只装 git，不含编译工具链 ——
+    多阶段构建的收益在这里成立。
+
+构建过程中的网络干扰（非项目缺陷，记录以免误判）
+  首次构建失败：auth.docker.io 连接超时，基础镜像拉不下来。
+  二次构建失败：deb.debian.org 返回 502 Bad Gateway，apt 取包中断。
+  处置：先逐个 docker pull 三个基础镜像（均一次成功），再用重试循环跑
+  docker compose build，第 2 次尝试通过。
+  两次失败都在「取远端资源」这一步，与 Dockerfile 内容无关。
+
+附带确认：pyproject.toml 的 mcp 上界修正在容器里同样生效
+  容器内 pip 解析到 mcp-1.29.1（<2）。
+  修正前若在容器里构建会拿到 2.x，MCP server 同样 import 失败。
+  该缺陷的完整记录见 2026-08-25-u15-fresh-clone-readme.txt。
+
+────────────────────────────────────────────────────────────────────
+二、容器启动与可访问性
+────────────────────────────────────────────────────────────────────
+
+  docker compose up -d
+    backend  | running | healthy（compose healthcheck 通过）
+    frontend | running
+
+  后端健康端点（宿主端口）
+    GET /api/health → HTTP 200
+    {"status":"ok","llm_flash":"glm-5.2","llm_pro":"claude-sonnet-5",
+     "embedding_provider":"api","llm_configured":true}
+
+  前端首页
+    GET / → HTTP 200，425 字节（index.html）
+
+  前端 nginx 反向代理到后端（走 compose 内部网络，不经宿主端口）
+    GET /api/health（打前端端口）→ HTTP 200，返回同一份后端响应
+    这条是关键：它证明容器间网络与 nginx 的 /api 转发规则都对。
+
+  容器内前端的真实浏览器渲染
+    playwright 打容器前端端口：
+      desktop 1440x900  scrollWidth=1440 clientWidth=1440 → 无溢出
+      narrow  375x812   scrollWidth=375  clientWidth=375  → 无溢出
+      完成态 h2：架构报告 / 代码评审 / 代码问答
+    （API 用路由拦截喂固件，验证的是容器里那份前端产物本身。）
+
+  卷挂载与缓存路径对齐
+    容器内 WORKSPACE_ROOT=/data
+    /data 挂在独立设备上（df 显示 1007G 设备，非容器可写层）
+    新建的命名卷，当前为空 —— 符合首次启动的预期。
+
+端口说明
+  验证时本机 8000 被跑真实分析的 uvicorn 占着，故用一份临时 override 把宿主侧端口
+  改成 8100/8180。只改宿主映射，容器内端口与内部网络路径不变，前端到后端仍走
+  内部代理。docker-compose.yml 本身未改动。
+
+────────────────────────────────────────────────────────────────────
+三、镜像内无 API key
+────────────────────────────────────────────────────────────────────
+
+设计（两重保证）
+  backend/Dockerfile 不 COPY .env
+  .dockerignore 排除 .env 与 .env.*（但保留 !.env.example）
+  compose 用 env_file 在运行时注入
+
+实测核实（此前只有设计推断）
+  后端镜像
+    env | grep -iE "key|token|secret"
+      → 只有 GPG_KEY=7169605F...（python 基础镜像的公开签名密钥，非项目密钥）
+      → 无 DEEPSEEK_API_KEY、无 EMBEDDING_API_KEY
+    ls -a /app | grep "^\.env"           → 无 .env
+    ls /app                               → backend、pyproject.toml（仅此两项）
+    docker history --no-trunc | grep -c "sk-"        → 0
+    grep -rlE "sk-[A-Za-z0-9]{20,}" /app | wc -l    → 0
+  前端镜像
+    env | grep -iE "key|token|secret"     → 空
+    docker history 中 1 处 ".env" 匹配 → 经查是 nginx 基础镜像自带的
+      15-local-resolvers.envsh 文件名误命中，非密钥
+
+运行时注入确认（反向验证：镜像里没有，运行时必须有）
+  容器内 printenv：
+    DEEPSEEK_API_KEY  set=yes len=51
+    EMBEDDING_API_KEY set=yes len=51
+  设计成立：密钥不进镜像层，运行时由 env_file 注入。
+
+本次核查刻意避开了 backlog 首条记录的泄露动作
+  compose 配置核对改为只提取结构（services、卷挂载目标、端口、environment 的
+  键名），全程不打印任何变量值。
+    docker compose config → exit 0
+    services: backend, frontend
+    卷挂载目标: /data
+    端口: 8000, 80
+    WORKSPACE_ROOT: /data  ✓（与 U9 的缓存落盘路径对齐）
+
+────────────────────────────────────────────────────────────────────
+未覆盖
+────────────────────────────────────────────────────────────────────
+
+  「容器里提交基准仓库并拿到报告」：未做。容器用的是新建空卷，跑一次完整分析
+  会重复产生一整轮 LLM 与 embedding 费用，而同一条链路已由本机的真实分析覆盖
+  （见 U8 证据）。
+  「容器重启后索引缓存仍在」：未做。它依赖上一条先在容器内产出索引。
+  缓存机制本身已在本机实跑验证（二次运行 0 次 embedding 调用，加速比 6094×），
+  卷挂载点与 WORKSPACE_ROOT 的对齐也已核对，缺的是容器重启这一段的实测。
