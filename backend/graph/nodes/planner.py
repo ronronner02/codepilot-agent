@@ -17,12 +17,12 @@
 
 from __future__ import annotations
 
-import json
 import logging
 
 from backend.config import Settings
 from backend.graph.prompts.planner import SYSTEM_PROMPT, build_user_message
 from backend.graph.state import AnalysisState, ModulePlan
+from backend.providers.json_reply import iter_json_values, log_parse_failure
 from backend.providers.llm import LLMProvider
 from backend.static_analysis.models import DependencyGraph, Module
 
@@ -147,18 +147,19 @@ def _rule_only_plans(
 
 
 def _parse_decisions(raw: str) -> dict[str, dict[str, object]]:
-    """解析模型返回，按模块名索引。解析不出返回空字典，由调用方降级。"""
-    text = raw.strip()
-    if text.startswith("```"):
-        text = text.split("\n", 1)[-1].rsplit("```", 1)[0]
+    """解析模型返回，按模块名索引。解析不出返回空字典，由调用方降级。
 
-    try:
-        payload = json.loads(text)
-    except json.JSONDecodeError:
-        return {}
+    取取舍项最多的候选：返回里可能有多段 JSON（模型先给一份不完整的，再给完整的），
+    取第一个能解析的会选中残缺那份，多数模块就落回纯规则排序而无人察觉。
+    """
+    items: list[object] = []
+    for payload in iter_json_values(raw):
+        candidate = payload.get("decisions") if isinstance(payload, dict) else payload
+        if isinstance(candidate, list) and len(candidate) > len(items):
+            items = candidate
 
-    items = payload.get("decisions") if isinstance(payload, dict) else payload
-    if not isinstance(items, list):
+    if not items:
+        log_parse_failure("Planner 取舍", raw)
         return {}
 
     parsed: dict[str, dict[str, object]] = {}

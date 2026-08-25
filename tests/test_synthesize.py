@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 
 import pytest
@@ -291,6 +292,57 @@ class TestDegradedPaths:
         provider = _FakeProvider([fenced])
         result = await synthesize_report(_state(repo), make_settings(), provider)  # type: ignore[arg-type]
         assert len(result["report"].entrypoints.claims) == 1  # type: ignore[union-attr]
+
+    async def test_self_corrected_reply_takes_complete_block(self, repo: Path) -> None:
+        """模型自我更正时取完整那份，不是先出现的残缺那份。
+
+        实测形态（DEA-Net 汇总）：先输出只有 summary 的 JSON，接一句「遗漏了必要字段」，
+        再输出完整的一份。取第一个能解析的会得到零结论的报告，而那在界面上与「什么都
+        没分析出来」无法区分。
+        """
+        partial = json.dumps({"summary": "残缺那份"}, ensure_ascii=False)
+        complete = _reply(
+            module_breakdown=[_claim("核心在 core", {"path": "pkg/core.py", "line": 5})],
+            entrypoints=[_claim("入口在 api", {"path": "pkg/api.py", "line": 1})],
+        )
+        reply = (
+            f"```json\n{partial}\n```\n\n"
+            "上面遗漏了必要字段，完整报告如下：\n\n"
+            f"```json\n{complete}\n```"
+        )
+        provider = _FakeProvider([reply])
+        result = await synthesize_report(_state(repo), make_settings(), provider)  # type: ignore[arg-type]
+        report = result["report"]
+        assert report.summary == "总体印象"  # type: ignore[union-attr]
+        assert len(report.all_claims()) == 2  # type: ignore[union-attr]
+
+    async def test_unescaped_inner_quotes_recovered(self, repo: Path) -> None:
+        """summary 里出现未转义的双引号，不该让整份报告作废。
+
+        实测形态：模型写 `"网络定义 + 训练脚本"的结构`，裸引号让 JSON 字符串提前闭合。
+        """
+        reply = (
+            '{\n'
+            '  "summary": "该仓库是典型的"网络定义 + 训练脚本"结构。",\n'
+            '  "module_breakdown": [\n'
+            '    {"text": "核心在 core", "citations": [{"path": "pkg/core.py", "line": 5}]}\n'
+            '  ]\n'
+            '}'
+        )
+        provider = _FakeProvider([reply])
+        result = await synthesize_report(_state(repo), make_settings(), provider)  # type: ignore[arg-type]
+        report = result["report"]
+        assert "网络定义 + 训练脚本" in report.summary  # type: ignore[union-attr]
+        assert len(report.module_breakdown.claims) == 1  # type: ignore[union-attr]
+
+    async def test_parse_failure_logs_raw_head(
+        self, repo: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """解析失败要留下原文开头，否则日志里只有「无法解析」这个结论。"""
+        provider = _FakeProvider(["模型跑偏了，完全没给 JSON"])
+        with caplog.at_level(logging.WARNING, logger="codepilot.json_reply"):
+            await synthesize_report(_state(repo), make_settings(), provider)  # type: ignore[arg-type]
+        assert any("模型跑偏了" in record.getMessage() for record in caplog.records)
 
 
 class TestRequestShape:

@@ -22,6 +22,7 @@ import json
 import logging
 from dataclasses import dataclass
 
+from backend.providers.json_reply import iter_json_values, log_parse_failure
 from backend.providers.llm import LLMProvider, Tier
 from backend.review.models import (
     Candidate,
@@ -115,19 +116,19 @@ def _to_finding(candidate: Candidate, reason: str, severity: Severity) -> Findin
 
 
 def _parse_judgments(raw: str) -> dict[int, dict[str, str]]:
-    """解析模型返回。解析不出返回空字典，由调用方按「未判断」处理。"""
-    text = raw.strip()
-    # 有些模型会用 ```json 包裹，即使要求了 JSON 模式。
-    if text.startswith("```"):
-        text = text.split("\n", 1)[-1].rsplit("```", 1)[0]
+    """解析模型返回。解析不出返回空字典，由调用方按「未判断」处理。
 
-    try:
-        payload = json.loads(text)
-    except json.JSONDecodeError:
-        return {}
+    取判断项最多的候选：返回里可能有多段 JSON，取第一个能解析的可能选中残缺那份，
+    余下候选按「未判断」处理——那会把已经查出的候选点静默降级。
+    """
+    items: list[object] = []
+    for payload in iter_json_values(raw):
+        candidate = payload.get("judgments") if isinstance(payload, dict) else payload
+        if isinstance(candidate, list) and len(candidate) > len(items):
+            items = candidate
 
-    items = payload.get("judgments") if isinstance(payload, dict) else payload
-    if not isinstance(items, list):
+    if not items:
+        log_parse_failure("评审判断", raw)
         return {}
 
     parsed: dict[int, dict[str, str]] = {}

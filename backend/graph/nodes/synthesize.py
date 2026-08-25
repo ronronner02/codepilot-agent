@@ -11,13 +11,13 @@ checkpoint 恢复而重跑。
 
 from __future__ import annotations
 
-import json
 import logging
 from pathlib import Path
 
 from backend.config import Settings
 from backend.graph.prompts.synthesize import SYSTEM_PROMPT, build_synthesis_message
 from backend.graph.state import AnalysisState
+from backend.providers.json_reply import iter_json_values, log_parse_failure
 from backend.providers.llm import LLMProvider
 from backend.report.schema import (
     ArchitectureReport,
@@ -117,17 +117,7 @@ def _parse_section(key: str, raw: object) -> ReportSection:
     return ReportSection(key=key, title=_SECTION_TITLES[key], claims=tuple(claims))
 
 
-def _parse_report(raw: str, repo: str, commit_sha: str) -> ArchitectureReport | None:
-    text = raw.strip()
-    if text.startswith("```"):
-        text = text.split("\n", 1)[-1].rsplit("```", 1)[0]
-    try:
-        payload = json.loads(text)
-    except json.JSONDecodeError:
-        return None
-    if not isinstance(payload, dict):
-        return None
-
+def _build_report(payload: dict[str, object], repo: str, commit_sha: str) -> ArchitectureReport:
     summary = payload.get("summary")
     return ArchitectureReport(
         repo=repo,
@@ -139,6 +129,29 @@ def _parse_report(raw: str, repo: str, commit_sha: str) -> ArchitectureReport | 
         key_flows=_parse_section("key_flows", payload.get("key_flows")),
         tech_stack=_parse_section("tech_stack", payload.get("tech_stack")),
     )
+
+
+def _parse_report(raw: str, repo: str, commit_sha: str) -> ArchitectureReport | None:
+    """从返回里取出报告。取结论最多的那个候选，而非第一个能解析的。
+
+    实测的失效形态：模型先输出一份只有 summary 的 JSON，紧跟一句「上面遗漏了必要字段，
+    完整报告如下」，再输出完整的一份。取第一个能解析的会选中残缺那份——报告只剩一句
+    总体印象，五节全空，而这在界面上与「模型什么都没分析出来」无法区分。
+
+    结论数是这里唯一说得通的取舍标准：候选之间的差别就是内容多少，而空节没有价值。
+    """
+    best: ArchitectureReport | None = None
+    best_claims = -1
+
+    for payload in iter_json_values(raw):
+        if not isinstance(payload, dict):
+            continue
+        report = _build_report(payload, repo, commit_sha)
+        count = len(report.all_claims())
+        if count > best_claims:
+            best, best_claims = report, count
+
+    return best
 
 
 def build_missing_parts(state: AnalysisState, rejected_claims: int) -> MissingParts:
@@ -270,6 +283,7 @@ async def synthesize_report(
 
     parsed = _parse_report(content, repo, commit)
     if parsed is None:
+        log_parse_failure("报告汇总", content)
         report = ArchitectureReport(
             repo=repo,
             commit_sha=commit,
