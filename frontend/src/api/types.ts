@@ -34,6 +34,68 @@ export interface AnalyzeAccepted {
   repo: string
   stage: Stage
   message: string
+  /** 排队位置（1-based）。0 表示已直接开始（R-54）。 */
+  queue_position: number
+}
+
+/** 最近分析列表的一条（U9、U21）。不含任何评分字段（NA-01）。 */
+export interface AnalysisSummary {
+  task_id: string
+  repo: string
+  stage: Stage
+  completed: boolean
+  failed: boolean
+  commit_sha: string
+  /** Unix 秒。界面按它倒序并格式化显示（R-45）。 */
+  created_at: number
+  file_count: number
+  finding_count: number
+}
+
+/** 文件的一段内容（U12）。 */
+export interface FileContent {
+  path: string
+  start_line: number
+  end_line: number
+  total_lines: number
+  content: string
+  /** 截断必须可见，不静默（R-18）。 */
+  truncated: boolean
+  truncated_note: string
+}
+
+export interface FileTreeEntry {
+  /** 仓库相对路径。跳转与高亮都按它匹配。 */
+  path: string
+  is_dir: boolean
+  /** 目录的直接子文件数。文件条目为 0。 */
+  file_count: number
+}
+
+export interface FileTree {
+  root: string
+  entries: FileTreeEntry[]
+  truncated_note: string
+}
+
+export interface SearchHit {
+  path: string
+  start_line: number
+  end_line: number
+  /** 所属符号名。模块级切块为空串。 */
+  symbol: string
+  content: string
+  /** 距离越小越相关。不换算成百分比——那会造出一个后端没有的数字。 */
+  distance: number
+}
+
+export interface SearchResult {
+  query: string
+  /** found 与 hits 分开：「未命中」与「未建索引」是两件事，后者由 409 表达（R-25）。 */
+  found: boolean
+  hits: SearchHit[]
+  reason: string
+  note: string
 }
 
 /**
@@ -113,6 +175,52 @@ export interface IndexStatus {
   note: string
 }
 
+/** 一个模块分组，附该模块的分析结论。summary 是原文，界面不得二次概括（R-11）。 */
+export interface ModuleInfo {
+  name: string
+  files: string[]
+  internal_edges: number
+  external_edges: number
+  /** 分组来历：directory / split / merged。 */
+  origin: string
+  summary: string
+  /** 非空表示该模块分析不完整，界面须标注。 */
+  limitation: string
+}
+
+/** 一条依赖边。方向是「导入方 → 被导入方」（R-09）。 */
+export interface DependencyEdge {
+  source: string
+  target: string
+}
+
+export interface UnresolvedImport {
+  target: string
+  path: string
+  line: number
+  reason: string
+}
+
+export interface DependencyGraphInfo {
+  nodes: string[]
+  edges: DependencyEdge[]
+  /** 仓库外依赖：原始 import 目标 → 导入它的文件。 */
+  external: Record<string, string[]>
+  /** 指向仓库内却没解析到的 import。与 external 区分：这是解析规则的缺口。 */
+  unresolved: UnresolvedImport[]
+  cycles: string[][]
+  granularity: string
+  /** 非空表示已降级为目录级粒度，界面须显式标注（R-13）。 */
+  degraded_reason: string
+}
+
+/** 语言构成。by_language 是全量映射，截断前几项是界面职责。 */
+export interface LanguageProfile {
+  total_files: number
+  parseable_files: number
+  by_language: Record<string, number>
+}
+
 export interface AnalysisResult {
   task_id: string
   repo: string
@@ -120,9 +228,16 @@ export interface AnalysisResult {
   completed: boolean
   failed: boolean
   error: string
+  /** 排队位置（1-based）。0 表示已开跑或已终止（R-54）。 */
+  queue_position: number
+  /** 顶层 commit：报告为 null 时概览条仍要显示它。 */
+  commit_sha: string
   report: Report | null
   review: Review | null
   index: IndexStatus | null
+  modules: ModuleInfo[]
+  dependency_graph: DependencyGraphInfo | null
+  language_profile: LanguageProfile | null
   module_failures: string[]
 }
 

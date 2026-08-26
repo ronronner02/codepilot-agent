@@ -4,19 +4,30 @@
  * 全部颜色派生自用户提供的「深蓝柔粉」配色：#303d67（基调）、#79799a（过渡）、
  * #fddfdc（辅助）。色阶沿同一色相 226° 铺开，所以深浅变化不会引入第二种蓝。
  *
- * 渐变只用三处：品牌条、进度填充、统计卡顶部发丝线。大面积渐变会压过正文可读性，
- * 而这个界面的主要任务是读一份长报告。
+ * **渐变作为页面底色（U22，R-62）。** 此前的判断是「渐变只用三处：品牌条、进度填充、统计卡
+ * 顶部发丝线；大面积渐变会压过正文可读性」——那条限制已被 owner 的 D8 决定推翻。
+ *
+ * 推翻它之后，可读性靠**分层**而非靠调淡渐变（R-63、BR-005）：渐变铺在最底层，正文与代码
+ * 区域用不透明的 --panel / --veil 背景层浮在其上。渐变因此可见于页面边缘与面板间隙，而阅读
+ * 区域的对比度完全不受它影响。
+ *
+ * 调淡渐变是那个被拒的做法：它会同时削弱 R-62（渐变要可见）与 R-63（对比度要够），
+ * 两头都不讨好。
  */
 
 :root {
   /* 深蓝色阶（hue 226°，由 #303d67 派生） */
-  --canvas: #131725;
-  --veil: #171c2d;
-  --panel: #1e2439;
-  --panel-raised: #272f49;
+  /* 面板色系从基调 #303d67 提亮而来，不是独立的近黑色阶。
+     渐变作底色之后，近黑面板会像压在图上的黑洞；同族色让它们读起来属于同一张图。
+     实测对比度（vs --ink #e9ebf5）：canvas 13.5、veil 12.7、panel 11.5、raised 9.8，
+     正文 AA 需 4.5，全部有余量。 */
+  --canvas: #1a2038;
+  --veil: #1e2540;
+  --panel: #242c4a;
+  --panel-raised: #2e3757;
   --anchor: #303d67;
-  --line: #2b3350;
-  --line-strong: #3c4771;
+  --line: #333d63;
+  --line-strong: #46538a;
 
   /* 文字：灰紫系，#79799a 直接取自配色的过渡色 */
   --ink: #e9ebf5;
@@ -34,14 +45,35 @@
   --danger: #ef9a94;
   --info: #93a9e6;
 
+  /* 装饰用渐变：品牌条、进度填充、统计卡发丝线。饱和度全开，因为覆盖面积很小。 */
   --grad: linear-gradient(135deg, #303d67 0%, #79799a 55%, #fddfdc 100%);
+
+  /* 页面底色。**就是配色本身的三色渐变，不压暗。**
+     *
+     * 此前这里是一个压暗版，理由是「全饱和的粉会让面板像贴纸」。owner 直接给了配色图并
+     * 要求以它为底色，所以改回原三色。
+     *
+     * 代价是实测出来的：浅色文字（--ink）在三色上的对比度分别是深蓝 8.88、过渡紫 3.52、
+     * 柔粉 1.05 —— 只有深蓝端能直接承载文字。所以内容列必须有托底层（见 .column），
+     * 渐变只在页边距与面板间隙裸露。这不是折衷，是让 R-62（渐变可见）与 R-63（对比度）
+     * 同时成立的唯一做法：压淡渐变会同时削弱两者。 */
+  --grad-page: linear-gradient(135deg, #303d67 0%, #79799a 55%, #fddfdc 100%);
 
   --sans: 'Inter', -apple-system, 'Segoe UI', 'Microsoft YaHei', 'PingFang SC',
     'Noto Sans SC', system-ui, sans-serif;
   --mono: 'Cascadia Code', 'JetBrains Mono', 'SF Mono', Consolas, 'Courier New', monospace;
 
-  /* 阅读列宽上限。72ch 是长中文段落不必来回扫视的宽度上限。 */
-  --read: 72ch;
+  /* 内容列宽。**全站唯一的宽度权威。**
+     *
+     * 一页只有这一个宽度：面板填满列，文字填满面板，不再有嵌套的宽度上限。此前把上限
+     * 加在段落上（文字 800px、面板 1060px）或加在面板上（面板 700px、列 1300px），
+     * 两次都产生同一个症状——右侧留出一大片空白，看起来像排版坏了。
+     *
+     * 1060px 下混排中文约 65 字/行，在舒适区偏宽的一侧但可读；剩余空间由列的 margin
+     * auto 变成左右对称的页边距，读起来是有意留白而非内容缺失。
+     *
+     * 需要更宽的内容（三栏查看器、节点图）各自在自己的规则里放开。 */
+  --content: 1060px;
   --radius: 10px;
   --radius-sm: 6px;
 }
@@ -57,7 +89,11 @@ body {
 }
 
 body {
+  /* 渐变底色（R-62）。--canvas 作为回退：渐变不支持时仍是深蓝底而非白底。
+     fixed 让渐变不随滚动移动——跟着滚会让长页面在中途出现明显的色带接缝。 */
   background: var(--canvas);
+  background-image: var(--grad-page);
+  background-attachment: fixed;
   color: var(--ink);
   font-family: var(--sans);
   font-size: 15px;
@@ -333,7 +369,7 @@ input {
 }
 
 .column {
-  max-width: 1060px;
+  max-width: var(--content);
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -801,7 +837,6 @@ details > ul > li {
 }
 
 .report__summary {
-  max-width: var(--read);
   margin-top: 1.1rem;
   font-size: 1rem;
   line-height: 1.75;
@@ -809,7 +844,6 @@ details > ul > li {
 }
 
 .report__empty {
-  max-width: var(--read);
   margin-top: 1.1rem;
   line-height: 1.75;
   color: var(--ink-mid);
@@ -832,7 +866,6 @@ details > ul > li {
 }
 
 .report__claim-text {
-  max-width: var(--read);
   line-height: 1.75;
   color: var(--ink);
 }
@@ -879,7 +912,6 @@ details > ul > li {
 }
 
 .report__validation {
-  max-width: var(--read);
   margin-top: 1.1rem;
   font-size: 0.83rem;
   color: var(--ink-dim);
@@ -923,7 +955,6 @@ details > ul > li {
 }
 
 .review__empty {
-  max-width: var(--read);
   margin-top: 1.1rem;
   line-height: 1.75;
   color: var(--ink-mid);
@@ -980,14 +1011,12 @@ details > ul > li {
 }
 
 .finding__message {
-  max-width: var(--read);
   line-height: 1.7;
   color: var(--ink);
 }
 
 /* 判断依据与结论视觉分层：读者要能区分「机器凭什么定位」与「模型凭什么认为值得管」。 */
 .finding__evidence {
-  max-width: var(--read);
   margin-top: 0.45rem;
   padding-left: 0.7rem;
   border-left: 2px solid var(--line);
@@ -1032,7 +1061,6 @@ details > ul > li {
 }
 
 .qa__not-found-text {
-  max-width: var(--read);
   line-height: 1.7;
   color: var(--ink);
 }
@@ -1053,7 +1081,6 @@ details > ul > li {
 }
 
 .qa__answer-text {
-  max-width: var(--read);
   line-height: 1.75;
   color: var(--ink);
 }
@@ -1105,46 +1132,9 @@ details > ul > li {
 /* ── 窄视口：侧栏转顶部横向导航 ─────────────────────── */
 
 @media (max-width: 960px) {
-  .shell {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .rail {
-    position: static;
-    height: auto;
-    flex-direction: row;
-    align-items: center;
-    gap: 1rem;
-    padding: 0.8rem 1rem;
-    border-right: 0;
-    border-bottom: 1px solid var(--line);
-    overflow-x: auto;
-  }
-
-  .rail__nav {
-    flex-direction: row;
-    gap: 0.35rem;
-  }
-
-  .rail__label,
-  .rail__tag,
-  .rail__foot {
-    display: none;
-  }
-
-  .rail__item {
-    white-space: nowrap;
-  }
-
-  /* 横向导航下左侧指示条会挤压文字，改用下划线。 */
-  .rail__item--on::before {
-    display: none;
-  }
-
-  .rail__item--on {
-    box-shadow: inset 0 -2px 0 var(--accent);
-  }
-
+  /* 导航的窄视口形态已改为抽屉，规则在文件末尾的「多页工作台」一节。
+     此处原有的「转顶部横向滚动」是四项导航时的做法——九项排不下，横向滚动会让后几项
+     藏在屏幕外，而用户不知道那里还有内容。 */
   .topbar {
     padding: 0.75rem 1rem;
   }
@@ -1176,3 +1166,1220 @@ details > ul > li {
   }
 }
 
+/* ══ 多页工作台（U1~U22）════════════════════════════════
+ *
+ * 以下是路由多页形态新增的组件。阅读区域一律用不透明的 --panel / --veil 背景，让底色渐变
+ * 只在页面边缘与面板间隙可见（R-63、BR-005 的落点）。
+ */
+
+/* ── 抽屉开关：窄视口才显示（R-04）───────────────────── */
+
+.shell__drawer-toggle {
+  display: none;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  border: 1px solid var(--line-strong);
+  background: var(--veil);
+  color: var(--ink);
+  padding: 0.55rem 0.9rem;
+  border-radius: var(--radius-sm);
+  margin: 0.6rem 1rem;
+  align-self: flex-start;
+}
+
+/* ── 顶部概览条（U10）────────────────────────────────── */
+
+.strip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  min-width: 0;
+}
+
+.strip__repo {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.strip__repo--empty {
+  color: var(--ink-dim);
+  font-weight: 400;
+}
+
+.strip__sha {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  color: var(--ink-mid);
+  background: var(--panel);
+  padding: 0.15rem 0.45rem;
+  border-radius: var(--radius-sm);
+}
+
+.strip__stage {
+  font-size: 0.8rem;
+  color: var(--ink-mid);
+  border: 1px solid var(--line-strong);
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+}
+
+.strip__stats {
+  display: flex;
+  gap: 1rem;
+  margin: 0;
+}
+
+.strip__stat {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+}
+
+.strip__stat dt {
+  font-size: 0.75rem;
+  color: var(--ink-dim);
+}
+
+.strip__stat dd {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.strip__langs {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.75rem;
+  color: var(--ink-mid);
+}
+
+.strip__langs li {
+  background: var(--panel);
+  padding: 0.1rem 0.45rem;
+  border-radius: var(--radius-sm);
+}
+
+
+/* ── 页面容器（九页共用）───────────────────────────── */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  min-width: 0;
+}
+
+.page__title {
+  margin: 0;
+  font-size: 1.35rem;
+  letter-spacing: -0.01em;
+}
+
+/* 页标题可被程序聚焦（R-65 的焦点转移），焦点态要可见。 */
+.page__title:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+
+.page__section-title {
+  margin: 0.5rem 0 0;
+  font-size: 1.05rem;
+  color: var(--ink);
+}
+
+/* 空态与说明都用不透明面板：它们常是页面上唯一的内容，透出渐变会让文字发飘。 */
+.page__empty,
+.page__note {
+  margin: 0;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.85rem 1rem;
+  color: var(--ink-mid);
+}
+
+.page__empty {
+  color: var(--ink-dim);
+}
+
+.page__note ul {
+  margin: 0.5rem 0 0;
+  padding-left: 1.2rem;
+}
+
+.page__link {
+  color: var(--accent);
+  align-self: flex-start;
+}
+
+/* 查看器页要占满宽度，不受阅读列宽限制。 */
+.page--viewer {
+  max-width: none;
+}
+
+/* ── 首页最近分析列表（U9）──────────────────────────── */
+
+.history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.history__item {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.9rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.7rem 0.95rem;
+}
+
+.history__link {
+  font-weight: 600;
+  color: var(--ink);
+  text-decoration: none;
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.history__link:hover {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.history__meta {
+  font-size: 0.78rem;
+  color: var(--ink-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Architecture：图 + 详情 + 等价文本（U11）────────── */
+
+.arch {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 1rem;
+  align-items: start;
+}
+
+.graph {
+  height: 460px;
+  background: var(--veil);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+/* 自定义节点（R-64 要求可 Tab 且焦点态可见）。 */
+.graph-node {
+  width: 190px;
+  min-height: 64px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.15rem;
+  padding: 0.5rem 0.7rem;
+  background: var(--panel-raised);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.graph-node--on {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.graph-node:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.graph-node__name {
+  font-weight: 600;
+  font-size: 0.85rem;
+  word-break: break-all;
+}
+
+.graph-node__meta {
+  font-size: 0.72rem;
+  color: var(--ink-dim);
+}
+
+.module-detail {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.9rem 1rem;
+  min-width: 0;
+  /* 与节点图同高，内部滚动。
+   *
+   * 不限高时，长 summary（实测有到几千字符的）会把整行撑到几千像素，把下方的等价文本
+   * 表达挤出首屏——用户看到的是一页只有半张图和一大片文字。
+   *
+   * **不截断文字**：R-11 要求逐字呈现模块结论，截断就违反它。滚动保留全文，只约束
+   * 它占多少版面。 */
+  max-height: 460px;
+  overflow-y: auto;
+}
+
+.module-detail--empty {
+  color: var(--ink-dim);
+  font-size: 0.85rem;
+}
+
+.module-detail--empty p {
+  margin: 0;
+}
+
+.module-detail__heading {
+  margin: 0 0 0.6rem;
+  font-size: 1rem;
+  word-break: break-all;
+}
+
+.module-detail__stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.4rem 0.75rem;
+  margin: 0 0 0.8rem;
+}
+
+.module-detail__stats dt {
+  font-size: 0.72rem;
+  color: var(--ink-dim);
+}
+
+.module-detail__stats dd {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.module-detail__section {
+  margin: 0.8rem 0 0.35rem;
+  font-size: 0.82rem;
+  color: var(--ink-mid);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.module-detail__summary {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.65;
+}
+
+.module-detail__summary--absent {
+  color: var(--ink-dim);
+}
+
+.module-detail__limitation {
+  margin: 0.6rem 0 0;
+  font-size: 0.82rem;
+  color: var(--warn);
+  border-left: 2px solid var(--warn);
+  padding-left: 0.6rem;
+}
+
+.module-detail__files {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  /* 不设独立滚动：侧栏本身已限高滚动，这里再套一层会形成嵌套滚动区——鼠标滚到哪一层
+     取决于指针位置，很难操作。整个侧栏一个滚动区就够。 */
+}
+
+/* ── 等价文本表达（U11、BR-006）─────────────────────── */
+
+.dep-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.dep-text__table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+}
+
+.dep-text__caption {
+  text-align: left;
+  padding: 0.55rem 0.8rem;
+  color: var(--ink-mid);
+  font-size: 0.8rem;
+}
+
+.dep-text__table th,
+.dep-text__table td {
+  padding: 0.45rem 0.8rem;
+  text-align: left;
+  border-top: 1px solid var(--line);
+}
+
+.dep-text__table thead th {
+  color: var(--ink-dim);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.dep-text__table td {
+  font-variant-numeric: tabular-nums;
+}
+
+.dep-text__pick {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--ink);
+  font-weight: 600;
+  border-bottom: 1px dashed var(--line-strong);
+}
+
+.dep-text__pick--on,
+.dep-text__pick:hover {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.dep-text__edges {
+  list-style: none;
+  margin: 0;
+  padding: 0.7rem 1rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+/* ── 代码查看器三栏（U12）───────────────────────────── */
+
+.viewer {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr) 300px;
+  gap: 0.9rem;
+  align-items: start;
+  min-width: 0;
+}
+
+.tree {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.4rem;
+  max-height: 70vh;
+  overflow: auto;
+  font-size: 0.82rem;
+}
+
+.tree__root,
+.tree__children {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.tree__node {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  width: 100%;
+  background: none;
+  border: 0;
+  color: var(--ink-mid);
+  padding: 0.28rem 0.5rem;
+  border-radius: var(--radius-sm);
+  text-align: left;
+  word-break: break-all;
+}
+
+.tree__node:hover {
+  background: var(--panel-raised);
+  color: var(--ink);
+}
+
+.tree__node--on {
+  background: var(--anchor);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* 文件树节点必须可 Tab 且焦点态可见（R-64）。 */
+.tree__node:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.tree__count {
+  margin-left: auto;
+  font-size: 0.7rem;
+  color: var(--ink-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.tree__empty,
+.tree__pending,
+.tree__note {
+  color: var(--ink-dim);
+  font-size: 0.78rem;
+  padding: 0.4rem 0.5rem;
+  list-style: none;
+}
+
+.viewer__main {
+  min-width: 0;
+}
+
+.code {
+  background: var(--veil);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.code__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.55rem 0.9rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.code__path {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  color: var(--ink);
+  word-break: break-all;
+}
+
+.code__meta {
+  font-size: 0.75rem;
+  color: var(--ink-dim);
+  white-space: nowrap;
+}
+
+.code__truncated {
+  margin: 0;
+  padding: 0.5rem 0.9rem;
+  background: var(--panel-raised);
+  color: var(--warn);
+  font-size: 0.8rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.code__body {
+  max-height: 70vh;
+  overflow: auto;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  line-height: 1.6;
+  padding: 0.5rem 0;
+}
+
+.code__line {
+  display: flex;
+  gap: 0.9rem;
+  padding: 0 0.9rem;
+}
+
+/* 跳转目标行高亮（R-16 的定位可见性）。 */
+.code__line--on {
+  background: var(--anchor);
+}
+
+.code__gutter {
+  flex: 0 0 3.5rem;
+  text-align: right;
+  color: var(--ink-dim);
+  user-select: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.code__text {
+  white-space: pre;
+  min-width: 0;
+}
+
+.code__empty {
+  margin: 0;
+  padding: 1rem 0.9rem;
+  color: var(--ink-dim);
+  font-size: 0.85rem;
+}
+
+/* ── 查看器右栏：该文件的发现（U12）─────────────────── */
+
+.findings {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.8rem 0.95rem;
+  max-height: 70vh;
+  overflow-y: auto;
+  min-width: 0;
+}
+
+.findings--empty {
+  color: var(--ink-dim);
+  font-size: 0.82rem;
+}
+
+.findings--empty p {
+  margin: 0;
+}
+
+.findings__heading {
+  margin: 0 0 0.6rem;
+  font-size: 0.95rem;
+}
+
+/* 四种空态共用这个样式，但文案各不相同（R-20、KTD10）。 */
+.findings__state {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--ink-mid);
+  line-height: 1.6;
+}
+
+.findings__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.finding__severity-raw {
+  font-size: 0.7rem;
+  color: var(--ink-dim);
+  border: 1px solid var(--line-strong);
+  padding: 0 0.3rem;
+  border-radius: var(--radius-sm);
+}
+
+.finding__whole-file {
+  margin: 0.25rem 0;
+  font-size: 0.78rem;
+  color: var(--ink-dim);
+}
+
+/* ── 引用链接（U13）─────────────────────────────────── */
+
+/* 可点引用沿用 .citation 的等宽与横向滚动（R-37、AE-19 的既有成果），只加可点的外观。 */
+.citation--link {
+  color: var(--ink);
+  text-decoration: none;
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.citation--link:hover {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* ── 评审页三态（U14）───────────────────────────────── */
+
+.review-state {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-left-width: 3px;
+  border-radius: var(--radius);
+  padding: 0.85rem 1rem;
+}
+
+.review-state--clean {
+  border-left-color: var(--ok);
+}
+
+.review-state--skipped {
+  border-left-color: var(--ink-dim);
+}
+
+.review-state--failed {
+  border-left-color: var(--danger);
+}
+
+.review-state__title {
+  margin: 0 0 0.35rem;
+  font-weight: 600;
+}
+
+.review-state__reason {
+  margin: 0 0 0.35rem;
+  font-size: 0.85rem;
+  color: var(--ink-mid);
+}
+
+.review-state__hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--ink-dim);
+}
+
+.review-state__counts {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--ink-mid);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── 评审执行情况表（U15）──────────────────────────── */
+
+.review-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+}
+
+.review-table__caption {
+  text-align: left;
+  padding: 0.55rem 0.8rem;
+  color: var(--ink-mid);
+  font-size: 0.8rem;
+}
+
+.review-table th,
+.review-table td {
+  padding: 0.5rem 0.8rem;
+  text-align: left;
+  border-top: 1px solid var(--line);
+  vertical-align: top;
+}
+
+.review-table thead th {
+  color: var(--ink-dim);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+/* ── 导出入口（U19、U20）───────────────────────────── */
+
+.export-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.8rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.7rem 1rem;
+}
+
+.export-bar__label {
+  font-size: 0.82rem;
+  color: var(--ink-mid);
+}
+
+.export-bar__link {
+  color: var(--ink);
+  text-decoration: none;
+  font-size: 0.85rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  padding: 0.25rem 0.7rem;
+}
+
+.export-bar__link:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.export-bar__note {
+  flex: 1 0 100%;
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--ink-dim);
+}
+
+/* ── Code Search（U16）─────────────────────────────── */
+
+.search__form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.search__label {
+  font-size: 0.82rem;
+  color: var(--ink-mid);
+}
+
+.search__row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.search__field {
+  flex: 1;
+  min-width: 0;
+  background: var(--panel);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  padding: 0.55rem 0.7rem;
+  font: inherit;
+}
+
+.search__field:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.search__error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 0.8rem;
+}
+
+.search__state {
+  margin: 0;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.8rem 1rem;
+  color: var(--ink-mid);
+}
+
+.search__hits {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.search__hit {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.search__hit-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.8rem;
+  padding: 0.55rem 0.85rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.search__hit-symbol {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--accent-deep);
+}
+
+.search__hit-distance {
+  margin-left: auto;
+  font-size: 0.72rem;
+  color: var(--ink-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.search__hit-code {
+  margin: 0;
+  padding: 0.7rem 0.85rem;
+  background: var(--veil);
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  line-height: 1.6;
+  overflow-x: auto;
+}
+
+/* ── 设置页（U17）──────────────────────────────────── */
+
+.settings__form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 1rem 1.1rem;
+  max-width: 34rem;
+}
+
+.settings__label {
+  font-size: 0.82rem;
+  color: var(--ink-mid);
+  margin-top: 0.5rem;
+}
+
+.settings__field {
+  background: var(--veil);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  padding: 0.5rem 0.7rem;
+  font: inherit;
+}
+
+.settings__field:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.settings__hint {
+  margin: 0.2rem 0 0;
+  font-size: 0.75rem;
+  color: var(--ink-dim);
+}
+
+.settings__actions {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 1rem;
+}
+
+.settings__actions button {
+  border: 1px solid var(--line-strong);
+  background: var(--panel-raised);
+  color: var(--ink);
+  border-radius: var(--radius-sm);
+  padding: 0.45rem 1rem;
+}
+
+.settings__actions button[type='submit'] {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+.settings__notice {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--ok);
+}
+
+.settings__status {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--ink-mid);
+}
+
+/* ── MCP 说明页（U18）──────────────────────────────── */
+
+.mcp__tools {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin: 0;
+}
+
+.mcp__tool {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.65rem 0.9rem;
+}
+
+.mcp__tool dt {
+  margin-bottom: 0.2rem;
+}
+
+.mcp__tool dd {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--ink-mid);
+  line-height: 1.6;
+}
+
+.mcp__config {
+  background: var(--veil);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.mcp__config-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.85rem;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+}
+
+.mcp__config-label {
+  font-size: 0.82rem;
+  color: var(--ink-mid);
+}
+
+.mcp__config-head button {
+  margin-left: auto;
+  border: 1px solid var(--line-strong);
+  background: var(--panel-raised);
+  color: var(--ink);
+  border-radius: var(--radius-sm);
+  padding: 0.25rem 0.7rem;
+  font-size: 0.8rem;
+}
+
+.mcp__config-state {
+  font-size: 0.75rem;
+  color: var(--ok);
+}
+
+.mcp__config-body {
+  margin: 0;
+  padding: 0.8rem 0.9rem;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  line-height: 1.6;
+  overflow-x: auto;
+}
+
+/* ── 失败提示的设置页入口 ─────────────────────────── */
+
+.failure__link {
+  display: inline-block;
+  margin-top: 0.5rem;
+  color: var(--accent);
+}
+
+/* ── 窄视口：导航转抽屉，三栏折叠（R-04）──────────── */
+
+@media (max-width: 960px) {
+  /* 九项导航横向排不下——改抽屉，默认收起（R-04）。
+     这推翻了 002 的「转顶部横向滚动」：那时只有四项，滚动可接受。 */
+  .shell {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .shell__drawer-toggle {
+    display: block;
+  }
+
+  .rail {
+    display: none;
+  }
+
+  .rail--open {
+    display: flex;
+    flex-direction: column;
+    position: static;
+    height: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .rail--open .rail__nav {
+    flex-direction: column;
+  }
+
+  .rail--open .rail__label,
+  .rail--open .rail__tag,
+  .rail--open .rail__foot {
+    display: revert;
+  }
+
+  /* 抽屉里恢复竖排的左侧指示条。 */
+  .rail--open .rail__item--on::before {
+    display: revert;
+  }
+
+  .rail--open .rail__item--on {
+    box-shadow: none;
+  }
+
+  /* 三栏折叠：文件树与发现栏移到代码上下方，代码占满宽度。 */
+  .viewer,
+  .arch {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tree,
+  .findings {
+    max-height: 320px;
+  }
+
+  .strip__stats {
+    flex-wrap: wrap;
+    gap: 0.5rem 0.9rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .search__row {
+    flex-direction: column;
+  }
+
+  .module-detail__stats {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* 历史列表里的失败标记：失败的分析仍列出，但要看得出来。 */
+.history__failed {
+  font-size: 0.72rem;
+  color: var(--danger);
+  border: 1px solid var(--danger);
+  border-radius: 999px;
+  padding: 0 0.45rem;
+}
+
+/* ── 节点图控件的深色适配 ─────────────────────────────
+ *
+ * React Flow 的 Controls 默认是浅色（按钮 #fefefe、边框 #eee），铺在 --veil 的深底上
+ * 几乎看不见——图标是浅灰描边压在近白底上，对比度两头都不够。
+ *
+ * 覆盖它自己的 --xy-* 变量而非直接写 .react-flow__controls-button 的样式：那些变量是
+ * 库的公开定制入口，直接改类样式会在库升级改结构时失效。
+ */
+
+.graph {
+  --xy-controls-button-background-color: var(--panel-raised);
+  --xy-controls-button-background-color-hover: var(--anchor);
+  --xy-controls-button-color: var(--ink);
+  --xy-controls-button-color-hover: var(--accent);
+  --xy-controls-button-border-color: var(--line-strong);
+}
+
+/* 图标是 fill 而非 color，要单独给。 */
+.graph .react-flow__controls-button svg {
+  fill: currentColor;
+}
+
+.graph .react-flow__controls-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* 背景网点也要压暗：默认色在深底上过亮，看着像噪点。 */
+.graph .react-flow__background {
+  --xy-background-pattern-color: var(--line);
+}
+
+/* ── 宽内容页放开列宽 ─────────────────────────────────
+ *
+ * 三栏查看器与节点图在 1060px 下都挤：查看器要塞文件树 + 代码 + 发现三栏，图要给
+ * 节点留出布局空间。
+ *
+ * 用 `:has()` 让列自己根据内部页面调整，而不是给 AppShell 传一个「当前是哪页」的参数
+ * ——那会让外壳知道它不需要知道的事，且每加一个宽页面都要改外壳。
+ */
+
+.column:has(.page--viewer),
+.column:has(.arch) {
+  max-width: min(1600px, 100%);
+}
+
+/* 节点图在宽列下可以更高，图才有纵向空间做分层布局。 */
+.column:has(.arch) .graph,
+.column:has(.arch) .module-detail {
+  max-height: 620px;
+}
+
+/* ══ 渐变底色下的可读性托底（R-63、BR-005）═════════════
+ *
+ * 实测：--ink 在渐变三色上的对比度是深蓝 8.88 / 过渡紫 3.52 / 柔粉 1.05。只有深蓝端
+ * 能直接承载浅色文字，而 `background-attachment: fixed` 下页面下半与右侧必然落在
+ * 紫粉区间——页标题、章节标题这些直接坐在背景上的文字会在那里失读。
+ *
+ * 托底层解决它：内容列铺一层半透明深色，文字永远落在可读的底上，而渐变在列的左右页边距
+ * 与面板之间的间隙里完整裸露。这正是配色图里那个内层圆角面板的做法。
+ */
+
+.column {
+  /* 半透明而非纯色：渐变的色相仍透上来，列不会变成一块与页面无关的深色矩形。
+     88% 是算出来的下限——再透就压不住柔粉区的浅色文字。 */
+  background: color-mix(in srgb, var(--canvas) 88%, transparent);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  /* 与渐变之间留一道极淡的边，让列的边界可辨而不抢注意力。 */
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--line) 60%, transparent);
+}
+
+/* canvas 的内边距让出来给列，避免双层内边距把内容挤窄。 */
+.canvas {
+  padding: 1.25rem;
+}
+
+/* ── 控件按主色调微调 ──────────────────────────────── */
+
+/* 主按钮用柔粉，深色字——柔粉在浅底上做背景色是它唯一对比度足够的用法。 */
+.repo-input__submit,
+.settings__actions button[type='submit'] {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border: 1px solid var(--accent);
+  font-weight: 600;
+}
+
+.repo-input__submit:hover:not(:disabled),
+.settings__actions button[type='submit']:hover {
+  background: var(--accent-deep);
+  border-color: var(--accent-deep);
+}
+
+/* 次级按钮：面板提亮色 + 强描边，hover 转向柔粉描边而非填充，避免与主按钮争视觉重量。 */
+.settings__actions button[type='button'],
+.mcp__config-head button,
+.search__row button,
+.qa__row button {
+  background: var(--panel-raised);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+}
+
+.settings__actions button[type='button']:hover,
+.mcp__config-head button:hover,
+.search__row button:hover:not(:disabled),
+.qa__row button:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* 输入框：底色比面板再深一档，让「可输入」在视觉上凹下去。 */
+.repo-input__field,
+.qa__field,
+.search__field,
+.settings__field {
+  background: color-mix(in srgb, var(--canvas) 70%, var(--panel));
+  border: 1px solid var(--line-strong);
+}
+
+.repo-input__field:focus,
+.qa__field:focus,
+.search__field:focus,
+.settings__field:focus {
+  border-color: var(--accent);
+  outline: none;
+  /* 焦点用柔粉的低透明度光晕，比纯描边更好辨认又不刺眼。 */
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}

@@ -2,7 +2,8 @@
 spec_id: 2026-08-25-002-ui-workbench-redesign
 artifact_kind: prd-requirements
 target_surface: H5/PC
-status: ready-for-planning
+status: superseded
+superseded_by: 2026-08-25-003-code-intelligence-workbench
 evidence_grade: mixed
 source_authority: mixed
 readiness_authority: engineering-owned
@@ -13,18 +14,11 @@ source_inputs:
   - frontend/src/App.tsx
   - frontend/src/styles.css
   - frontend/src/test/App.test.tsx
-write_mode: final-prd
-can_enter_spec_plan: yes
+write_mode: route-out
+can_enter_spec_plan: no
 clarification_evidence: asked-owner
 preflight_sweep_closure: closed
 next_owner_question: none
-readiness_verified_by: check-prd-artifact.js
-readiness_verified_at: 2026-08-25T11:10:54.333Z
-readiness_checker_schema: spec-prd-artifact-check.v1
-readiness_finding_count: 1
-readiness_blocking_count: 0
-readiness_prd_hash: sha256:53a3195ce7b49bf3ebc2420943d76a21ac1bd78a2263f3b1b105410ffede8113
-readiness_inputs_hash: sha256:c2d629e84723a000e9aa76db01339702246673bfa7b5a77e81c221dacb00cdb4
 ---
 
 # CodePilot 工作台界面改版 增量需求文档
@@ -416,17 +410,17 @@ design_degraded_owner_acceptance_ref: none
 
 ## Readiness Self-Check
 
-write_mode: final-prd
+write_mode: route-out
 clarification_evidence: asked-owner
 preflight_sweep_closure: closed
 decision_card_highest_risk_gap: 工作台形态（Grafana/GitHub 语义）与 plan R23 及 Scope Boundaries 正面冲突，且真仪表盘需要现有 API 不存在的耗时/成本/时间序列字段
-decision_card_next_action: final-prd
+decision_card_next_action: route-out
 decision_card_why_no_invention: R23 边界、统计四项口径、导航形态、配色三色值、后端零改动全部已由 owner 决定或 source 证据闭合；布局结构由 owner 选定的 ASCII 预览锁定；剩余仅间距/圆角/字号等 HOW 细节，planning 不需发明任何产品行为
 design_source_coverage: read
 first_unclosed_owner_question: none
 recommended default: none
-can_enter_spec_plan: yes
-why_not: none
+can_enter_spec_plan: no
+why_not: 已被 2026-08-25-003-code-intelligence-workbench 取代；BR-001/002/003/006 四条硬约束经 owner 推翻，planning 只认 003
 
 ## 变更记录
 

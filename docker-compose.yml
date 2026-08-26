@@ -18,17 +18,30 @@ services:
     environment:
       # 覆盖 .env 里可能存在的相对路径：容器内的工作区必须是卷挂载点。
       WORKSPACE_ROOT: /data
-      # 允许前端容器的源。前端经 nginx 同源反代访问 /api，正常不触发 CORS；
-      # 这里留着是为了宿主直连 8000 调试时也能用。
-      CORS_ORIGINS: '["http://localhost","http://localhost:5173","http://127.0.0.1:5173"]'
+      # 允许的前端源。前端经 nginx 同源反代访问 /api，正常不触发 CORS；这里留着是为了
+      # 宿主直连 8000 调试时也能用。
+      #
+      # 公网部署时经 CORS_ORIGINS 填实际域名（如 '["https://your.domain"]'）。不用通配：
+      # 这个 API 能触发克隆与 LLM 调用（有成本），通配会让任意站点都能消耗这些资源。
+      CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost","http://localhost:5173","http://127.0.0.1:5173"]}
+      # 三项资源保护的阈值。默认值见 backend/config.py，此处便于部署时按机器调整。
+      SUBMISSIONS_PER_WINDOW: ${SUBMISSIONS_PER_WINDOW:-3}
+      SUBMISSION_WINDOW_SECONDS: ${SUBMISSION_WINDOW_SECONDS:-3600}
+      MAX_CONCURRENT_ANALYSES: ${MAX_CONCURRENT_ANALYSES:-2}
+      REPOS_QUOTA_BYTES: ${REPOS_QUOTA_BYTES:-21474836480}
     volumes:
       # 卷挂载点与 U9 的缓存落盘路径一致（WORKSPACE_ROOT 派生 repos_dir 与 index_dir）。
       # 不一致会让容器重启后缓存失效，每次重新付 embedding 成本。
       - codepilot-data:/data
     ports:
-      # **只绑 127.0.0.1。** 后端没有鉴权层（Implementation Scope Boundaries 的有意决定），
-      # 而它能克隆任意仓库并消耗 LLM 额度。绑 0.0.0.0 等于把这个能力开放给同网段的任何人。
-      - "127.0.0.1:8000:8000"
+      # 绑定地址参数化，**默认仍是 127.0.0.1**（KTD9）。
+      #
+      # 默认不对外是安全的默认：后端没有鉴权层（有意决定），它能克隆任意仓库并消耗 LLM
+      # 额度。要对外必须显式设置 BIND_ADDR=0.0.0.0，而那之前应确认三项资源保护（IP 限流、
+      # 并发闸门、磁盘配额）的阈值合适——见 README 的「公网部署」一节。
+      #
+      # 回滚就是删掉这个变量并重启：一步可逆动作，不涉及数据迁移，落盘历史不受影响。
+      - "${BIND_ADDR:-127.0.0.1}:8000:8000"
     restart: unless-stopped
 
   frontend:
@@ -41,8 +54,9 @@ services:
         # 而用户看到的是「无法连接后端」——一个由启动顺序制造的假故障。
         condition: service_healthy
     ports:
-      # 同样只绑本地：界面能提交分析，等价于能触发克隆与 LLM 调用。
-      - "127.0.0.1:80:80"
+      # 同样参数化、同样默认本地。公网形态下通常只把这一个端口经反代暴露，
+      # 后端保持 127.0.0.1——前端容器内的 nginx 反代 /api，不需要后端对外可达。
+      - "${BIND_ADDR:-127.0.0.1}:${WEB_PORT:-80}:80"
     restart: unless-stopped
 
 volumes:

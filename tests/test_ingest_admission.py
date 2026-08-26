@@ -52,18 +52,36 @@ class TestWithinThresholds:
     def test_exactly_at_parseable_limit_passes(self) -> None:
         check_thresholds(REF, _meta(1000), _inv(1500), _settings(max_parseable_files=1500))
 
+    def test_django_scale_passes(self) -> None:
+        """2929 个可解析文件 / 282MB —— 门限放宽后应通过。
+
+        旧门限（1500 / 300MB）把这一档挡在外面，而它正是值得分析的项目规模。
+        """
+        check_thresholds(REF, _meta(282_129), _inv(2929, 7085), _settings())
+
+    def test_ts_heavy_scale_passes(self) -> None:
+        """refine 实测 6810 个可解析文件 —— 驱动门限定在 8000 的就是这一档。
+
+        TS 项目的文件数天然高于同规模 Python 项目，门限若定在 6000 会把它挡回去。
+        """
+        check_thresholds(REF, _meta(400_000), _inv(6810, 12_000), _settings())
+
 
 class TestRejections:
-    def test_django_scale_rejected_on_parseable_gate(self) -> None:
+    def test_parseable_gate_still_rejects_above_limit(self) -> None:
+        """门限放宽不等于取消：超过 8000 仍拒，且原因里带实际数字。"""
         with pytest.raises(RepoRejected) as exc:
-            check_thresholds(REF, _meta(282129), _inv(2929, 7085), _settings())
+            check_thresholds(REF, _meta(282_129), _inv(9500, 20_000), _settings())
         assert exc.value.reason is RejectReason.TOO_LARGE
-        assert "2929" in exc.value.detail
+        assert "9500" in exc.value.detail
 
     def test_size_gate_rejects_independently(self) -> None:
-        """可解析文件少但体积巨大——近期提交里有大二进制的形态。"""
+        """可解析文件少但体积巨大——近期提交里有大二进制的形态。
+
+        这道门与文件数门相互独立：50 个可解析文件本该秒过主门，副门仍要拦住它。
+        """
         with pytest.raises(RepoRejected) as exc:
-            check_thresholds(REF, _meta(500_000), _inv(50), _settings())
+            check_thresholds(REF, _meta(2_000_000), _inv(50), _settings())
         assert exc.value.reason is RejectReason.TOO_LARGE
         assert "KB" in exc.value.detail
 

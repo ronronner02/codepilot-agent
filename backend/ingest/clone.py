@@ -13,6 +13,7 @@ depth 200 在中型仓库拿到上千提交（depth 限制每条父链深度，�
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import shutil
 import stat
@@ -23,6 +24,8 @@ from pathlib import Path
 
 from backend.config import Settings
 from backend.ingest.guards import RejectReason, RepoRef, RepoRejected
+
+logger = logging.getLogger("codepilot.clone")
 
 
 @dataclass(frozen=True)
@@ -68,6 +71,77 @@ def _remove_tree(target: Path) -> None:
         )
 
 
+# 瞬时网络故障的特征串。
+#
+# **为什么要按输出文本分类。** git 的退出码对失败原因几乎没有信息量——仓库不存在、无权限、
+# TLS 断连全都是 128。而这三者对用户的下一步动作完全不同：换仓库、配 token、重试。把它们
+# 统一归成一种（此前是 NOT_FOUND）会让一次网络抖动显示成「仓库不存在，私有仓库需要配
+# GITHUB_TOKEN」，把人指向完全错误的修法。
+#
+# 实测触发这条的真实输出：
+#   fatal: unable to access '...': GnuTLS recv error (-110): The TLS connection was
+#   non-properly terminated.
+_TRANSIENT_PATTERNS = (
+    "gnutls recv error",
+    "tls connection",
+    "ssl_read",
+    "openssl ssl_read",
+    "unable to access",
+    "could not resolve host",
+    "connection reset",
+    "connection timed out",
+    "operation timed out",
+    "empty reply from server",
+    "remote end hung up",
+    "rpc failed",
+    "early eof",
+    "the remote end hung up unexpectedly",
+)
+
+# 明确的「不存在或无权限」特征。这些重试没有意义。
+_PERMANENT_PATTERNS = (
+    "repository not found",
+    "not found",
+    "does not exist",
+    "authentication failed",
+    "permission denied",
+    "access denied",
+    "invalid username or password",
+)
+
+# 瞬时失败的重试次数与退避基数。
+#
+# 3 次而非更多：TLS 断连通常是链路瞬时抖动，一两秒后重试就成；连续三次失败说明不是抖动，
+# 继续重试只是让用户多等。退避 2s / 4s——比 LLM 那边的退避短，因为克隆没有上游限流的问题，
+# 等久了没有额外收益。
+CLONE_MAX_ATTEMPTS = 3
+CLONE_RETRY_BASE_DELAY = 2.0
+
+
+def classify_clone_failure(output: str) -> tuple[RejectReason, bool]:
+    """按 git 的输出判断失败原因，并给出是否值得重试。
+
+    先判永久性再判瞬时性：「repository not found」里也含 "not found"，而某些网络错误的
+    文案会同时命中两边（例如 `unable to access` 后跟 404）。永久性优先能避免把明确的
+    404 当成抖动反复重试。
+    """
+    low = output.lower()
+    for pattern in _PERMANENT_PATTERNS:
+        if pattern in low:
+            reason = (
+                RejectReason.NO_ACCESS
+                if any(k in low for k in ("permission", "denied", "authentication"))
+                else RejectReason.NOT_FOUND
+            )
+            return reason, False
+    for pattern in _TRANSIENT_PATTERNS:
+        if pattern in low:
+            return RejectReason.NETWORK_ERROR, True
+    # 认不出来的失败按不可重试处理：宁可让用户看到原始 git 输出自己判断，
+    # 也不要在一个未知错误上反复重试三次、让他多等两轮退避。
+    return RejectReason.NOT_FOUND, False
+
+
 def git_env() -> dict[str, str]:
     """git 子进程的环境。
 
@@ -106,7 +180,16 @@ async def _run_git(args: list[str], cwd: Path | None, timeout: float) -> tuple[i
 
 
 async def clone_repo(
-    ref: RepoRef, settings: Settings, timeout: float = 180.0
+    # 600s 而非原先的 180s：准入门限放宽到 1.5GB 之后，大仓库的浅克隆在一般家用带宽下
+    # 会超过三分钟。超时太短的表现很误导——仓库明明通过了准入，却以 NETWORK_ERROR 失败，
+    # 让人以为是网络问题而不是「这个仓库对当前设置太大」。
+    #
+    # 超时仍然要有：git clone 卡在认证提示或对端不响应时不会自己退出，没有上限就是一个
+    # 永不收敛的任务。
+    ref: RepoRef,
+    settings: Settings,
+    timeout: float = 600.0,
+    attempt: int = 1,
 ) -> CloneResult:
     workdir = settings.repos_dir / ref.workdir_name
     workdir.parent.mkdir(parents=True, exist_ok=True)
@@ -128,13 +211,31 @@ async def clone_repo(
         timeout=timeout,
     )
     if code != 0:
+        reason, transient = classify_clone_failure(output)
         # 失败清理用 ignore_errors：此时已经在报错路径上，清理失败不应掩盖真正的
         # 克隆错误（那才是用户需要看到的信息）。
         shutil.rmtree(workdir, ignore_errors=True)
-        raise RepoRejected(
-            RejectReason.NOT_FOUND,
-            f"克隆失败：{ref.slug}。git 输出：{output.strip()[:300]}",
-        )
+
+        if transient and attempt < CLONE_MAX_ATTEMPTS:
+            delay = CLONE_RETRY_BASE_DELAY * attempt
+            logger.warning(
+                "克隆 %s 第 %d/%d 次失败（瞬时），%.0fs 后重试：%s",
+                ref.slug,
+                attempt,
+                CLONE_MAX_ATTEMPTS,
+                delay,
+                output.strip()[:160],
+            )
+            await asyncio.sleep(delay)
+            return await clone_repo(ref, settings, timeout, attempt + 1)
+
+        detail = f"克隆失败：{ref.slug}。git 输出：{output.strip()[:300]}"
+        if transient:
+            detail = (
+                f"克隆失败（网络问题，已重试 {CLONE_MAX_ATTEMPTS} 次）：{ref.slug}。"
+                f"git 输出：{output.strip()[:260]}"
+            )
+        raise RepoRejected(reason, detail)
 
     _, sha_out = await _run_git(["rev-parse", "HEAD"], cwd=workdir, timeout=30.0)
     _, count_out = await _run_git(

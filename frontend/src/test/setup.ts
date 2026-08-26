@@ -78,6 +78,33 @@ export class MockEventSource {
 
 vi.stubGlobal('EventSource', MockEventSource)
 
+/**
+ * ResizeObserver 的空实现。
+ *
+ * jsdom 不提供它，而 React Flow（U11 的节点图）在挂载时就会构造一个——缺了它组件直接抛异常，
+ * 整个 Architecture 页的测试都跑不起来。
+ *
+ * **这个 mock 只让组件挂载不抛，不让图的渲染变得可断言。** jsdom 没有布局引擎，所有元素尺寸
+ * 恒为 0，而 React Flow 依赖容器尺寸决定渲染什么。图的正确性断言落在同页的等价文本表达上
+ * （KTD8），图形本身的可用性由浏览器实跑核对承担。
+ */
+class MockResizeObserver {
+  observe(): void {}
+  unobserve(): void {}
+  disconnect(): void {}
+}
+
+vi.stubGlobal('ResizeObserver', MockResizeObserver)
+
+// DOMMatrixReadOnly 同理：React Flow 的缩放平移会用到它。
+if (typeof globalThis.DOMMatrixReadOnly === 'undefined') {
+  class MockDOMMatrix {
+    m22 = 1
+    constructor(_transform?: string) {}
+  }
+  vi.stubGlobal('DOMMatrixReadOnly', MockDOMMatrix)
+}
+
 afterEach(() => {
   cleanup()
   MockEventSource.reset()

@@ -12,6 +12,7 @@
 
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../App'
 import type { AnalysisResult, ProgressEvent } from '../api/types'
@@ -89,6 +90,11 @@ function result(overrides: Partial<AnalysisResult> = {}): AnalysisResult {
       ],
     },
     index: { cache_hit: false, chunk_count: 12, identity: 'api:m:v1', note: '新建索引' },
+    queue_position: 0,
+    commit_sha: 'abcdef123456789',
+    modules: [],
+    dependency_graph: null,
+    language_profile: null,
     module_failures: [],
     ...overrides,
   }
@@ -99,6 +105,7 @@ function stubFetch(handlers: {
   submit?: () => Promise<Response> | Response
   result?: () => Promise<Response> | Response
   question?: () => Promise<Response> | Response
+  list?: () => Promise<Response> | Response
 }): { calls: string[] } {
   const calls: string[] = []
   const json = (body: unknown, status = 200): Response =>
@@ -120,13 +127,69 @@ function stubFetch(handlers: {
       if (method === 'POST') {
         return (
           handlers.submit?.() ??
-          json({ task_id: 't1', repo: 'acme/widget', stage: 'queued', message: 'ok' })
+          json({
+            task_id: 't1',
+            repo: 'acme/widget',
+            stage: 'queued',
+            message: 'ok',
+            queue_position: 0,
+          })
         )
+      }
+      // 历史列表端点：路径恰好是 /api/analyses（没有 task 段）。首页挂载时会拉它。
+      if (/\/api\/analyses$/.test(url)) {
+        return handlers.list?.() ?? json([])
       }
       return handlers.result?.() ?? json(result())
     }),
   )
   return { calls }
+}
+
+/**
+ * 渲染工作台。
+ *
+ * **U1 之后必须包一层 Router。** 生产入口的 `BrowserRouter` 在 `main.tsx`，测试用
+ * `MemoryRouter` 换掉它——套在 `App` 内部就换不掉，会出现嵌套 Router 的运行时错误。
+ *
+ * `initialEntries` 让「直达某页 URL」成为一次普通渲染，不必先走一遍点击导航。
+ */
+function renderApp(initialPath = '/'): ReturnType<typeof render> {
+  return render(
+    <MemoryRouter initialEntries={[initialPath]}>
+      <App />
+    </MemoryRouter>,
+  )
+}
+
+/**
+ * 切到某个导航页。
+ *
+ * 这是 U1 测试改写的统一手法：在原断言之前插入一次导航，断言体本身不动。多页形态下任一
+ * 时刻只有一页在 DOM，而原测试是在「三个区块共存」的前提下写的。
+ */
+async function gotoNav(label: string): Promise<void> {
+  const user = userEvent.setup()
+  await user.click(screen.getByRole('link', { name: label }))
+}
+
+/**
+ * 预置访客凭证。
+ *
+ * U5 之后提交分析需要凭证（R-68），而 U17 的前端拦截会在未配置时直接阻止提交并引导到设置页
+ * ——那会让本文件里每个提交用例都停在那道拦截上。真实用户也是先配一次凭证再用，所以这里
+ * 在每个用例前把它配好。「未配置时被拦截」由 Settings 的测试专门断言。
+ */
+function seedCredentials(): void {
+  window.localStorage.setItem(
+    'codepilot.credentials.v1',
+    JSON.stringify({
+      base_url: 'https://guest.example',
+      api_key: 'guest-key',
+      model_flash: '',
+      model_pro: '',
+    }),
+  )
 }
 
 /**
@@ -160,6 +223,12 @@ async function submitRepo(url = REPO): Promise<void> {
   await user.click(screen.getByRole('button', { name: '开始分析' }))
 }
 
+// 每个用例前配好凭证。见 seedCredentials 的说明。
+beforeEach(() => {
+  window.localStorage.clear()
+  seedCredentials()
+})
+
 describe('提交', () => {
   beforeEach(() => {
     stubFetch({})
@@ -167,33 +236,35 @@ describe('提交', () => {
 
   it('空地址被表单阻止并提示，不发请求', async () => {
     const { calls } = stubFetch({})
-    render(<App />)
+    renderApp()
     const user = userEvent.setup()
     await user.click(screen.getByRole('button', { name: '开始分析' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('请输入 GitHub 仓库地址')
-    expect(calls).toHaveLength(0)
+    // 收窄到 POST：U9 之后首页挂载会拉一次历史列表（GET），而原断言要钉的是「没发提交
+    // 请求」。断言全部请求为 0 会把一个无关的只读请求算作违反。
+    expect(calls.filter((call) => call.startsWith('POST'))).toHaveLength(0)
   })
 
   it('只有空白的地址同样被阻止', async () => {
     const { calls } = stubFetch({})
-    render(<App />)
+    renderApp()
     const user = userEvent.setup()
     await user.type(screen.getByLabelText('GitHub 仓库地址'), '   ')
     await user.click(screen.getByRole('button', { name: '开始分析' }))
 
     expect(await screen.findByRole('alert')).toBeInTheDocument()
-    expect(calls).toHaveLength(0)
+    expect(calls.filter((call) => call.startsWith('POST'))).toHaveLength(0)
   })
 
   it('提交后进入分析中，出现进度区', async () => {
-    render(<App />)
+    renderApp()
     await submitRepo()
     expect(await screen.findByRole('heading', { name: '分析进度' })).toBeInTheDocument()
   })
 
   it('输入错误后重新输入会清掉提示', async () => {
-    render(<App />)
+    renderApp()
     const user = userEvent.setup()
     await user.click(screen.getByRole('button', { name: '开始分析' }))
     expect(await screen.findByRole('alert')).toBeInTheDocument()
@@ -206,7 +277,7 @@ describe('提交', () => {
 describe('重复提交', () => {
   it('分析中按钮被禁用，且给出禁用原因', async () => {
     stubFetch({})
-    render(<App />)
+    renderApp()
     await submitRepo()
 
     const button = await screen.findByRole('button', { name: '分析中…' })
@@ -216,7 +287,7 @@ describe('重复提交', () => {
 
   it('分析中再次提交不发起第二次请求', async () => {
     const { calls } = stubFetch({})
-    render(<App />)
+    renderApp()
     await submitRepo()
     await screen.findByRole('heading', { name: '分析进度' })
 
@@ -232,7 +303,7 @@ describe('重复提交', () => {
 describe('进度', () => {
   it('进度区随 SSE 事件更新阶段文本', async () => {
     stubFetch({})
-    render(<App />)
+    renderApp()
     await submitRepo()
     await screen.findByRole('heading', { name: '分析进度' })
 
@@ -249,7 +320,7 @@ describe('进度', () => {
 
   it('阶段文本在 aria-live 区内，供读屏播报', async () => {
     stubFetch({})
-    render(<App />)
+    renderApp()
     await submitRepo()
     await screen.findByRole('heading', { name: '分析进度' })
 
@@ -261,7 +332,7 @@ describe('进度', () => {
 
   it('给出百分比时渲染 progressbar，缺失时用不确定态', async () => {
     stubFetch({})
-    render(<App />)
+    renderApp()
     await submitRepo()
     await screen.findByRole('heading', { name: '分析进度' })
 
@@ -275,7 +346,7 @@ describe('进度', () => {
 
   it('单条坏事件不中断整个流', async () => {
     stubFetch({})
-    render(<App />)
+    renderApp()
     await submitRepo()
     await screen.findByRole('heading', { name: '分析进度' })
 
@@ -287,7 +358,7 @@ describe('进度', () => {
 
   it('失败的模块在历史里标出，不影响整体推进', async () => {
     stubFetch({})
-    render(<App />)
+    renderApp()
     await submitRepo()
     await screen.findByRole('heading', { name: '分析进度' })
 
@@ -307,7 +378,7 @@ describe('进度', () => {
 describe('SSE 生命周期', () => {
   it('卸载时关闭连接', async () => {
     stubFetch({})
-    const view = render(<App />)
+    const view = renderApp()
     await submitRepo()
     await screen.findByRole('heading', { name: '分析进度' })
 
@@ -321,7 +392,7 @@ describe('SSE 生命周期', () => {
   it('卸载后到达的事件不触发状态更新告警', async () => {
     stubFetch({})
     const warn = vi.spyOn(console, 'error').mockImplementation(() => {})
-    const view = render(<App />)
+    const view = renderApp()
     await submitRepo()
     await screen.findByRole('heading', { name: '分析进度' })
 
@@ -335,7 +406,7 @@ describe('SSE 生命周期', () => {
 
   it('连接中断时呈现断连状态与重连入口', async () => {
     stubFetch({})
-    render(<App />)
+    renderApp()
     await submitRepo()
     await screen.findByRole('heading', { name: '分析进度' })
 
@@ -350,7 +421,7 @@ describe('SSE 生命周期', () => {
     // 后端没起、任务标识失效都走这条路径。早返回分支若忽略 disconnected，
     // 用户会永远停在「正在启动分析…」上——正是计划要求避免的静默停滞。
     stubFetch({})
-    render(<App />)
+    renderApp()
     await submitRepo()
     await screen.findByRole('heading', { name: '分析进度' })
 
@@ -363,7 +434,7 @@ describe('SSE 生命周期', () => {
 
   it('重连建立新连接且不留旧连接', async () => {
     stubFetch({})
-    render(<App />)
+    renderApp()
     await submitRepo()
     await screen.findByRole('heading', { name: '分析进度' })
 
@@ -381,7 +452,7 @@ describe('SSE 生命周期', () => {
 
   it('收到终止事件后主动关闭连接', async () => {
     stubFetch({})
-    render(<App />)
+    renderApp()
     await submitRepo()
     await screen.findByRole('heading', { name: '分析进度' })
 
@@ -393,7 +464,7 @@ describe('SSE 生命周期', () => {
 
   it('终止后的连接错误不被误判为断连', async () => {
     stubFetch({})
-    render(<App />)
+    renderApp()
     await submitRepo()
     await screen.findByRole('heading', { name: '分析进度' })
 
@@ -422,7 +493,7 @@ describe('失败的分类呈现（AE6）', () => {
           headers: { 'Content-Type': 'application/json' },
         }),
     })
-    render(<App />)
+    renderApp()
     await submitRepo()
 
     const alert = await screen.findByRole('alert')
@@ -443,7 +514,7 @@ describe('失败的分类呈现（AE6）', () => {
           { status: 413, headers: { 'Content-Type': 'application/json' } },
         ),
     })
-    render(<App />)
+    renderApp()
     await submitRepo()
 
     const alert = await screen.findByRole('alert')
@@ -453,7 +524,7 @@ describe('失败的分类呈现（AE6）', () => {
 
   it('网络失败与业务错误分开呈现', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch') }))
-    render(<App />)
+    renderApp()
     await submitRepo()
 
     const alert = await screen.findByRole('alert')
@@ -464,7 +535,7 @@ describe('失败的分类呈现（AE6）', () => {
     stubFetch({
       submit: () => new Response('<html>502 Bad Gateway</html>', { status: 502 }),
     })
-    render(<App />)
+    renderApp()
     await submitRepo()
 
     const alert = await screen.findByRole('alert')
@@ -473,14 +544,21 @@ describe('失败的分类呈现（AE6）', () => {
 })
 
 describe('报告渲染', () => {
+  /**
+   * 跑到完成态再切到 Reports 页。
+   *
+   * **U1 的改写手法：原断言前插入一次导航，断言体不动。** 多页形态下报告在 Reports 页而非
+   * 与进度同屏——「架构报告」标题的等待因此从「完成后自动出现」变成「切页后出现」。
+   */
   async function completeAnalysis(overrides: Partial<AnalysisResult> = {}): Promise<void> {
     stubFetch({ result: () => new Response(JSON.stringify(result(overrides)), {
       status: 200, headers: { 'Content-Type': 'application/json' },
     }) })
-    render(<App />)
+    renderApp()
     await submitRepo()
     await screen.findByRole('heading', { name: '分析进度' })
     await emitProgress(progress({ stage: 'done', label: '完成', percent: 100 }))
+    await gotoNav('Reports')
     await screen.findByRole('heading', { name: '架构报告' })
   }
 
@@ -514,9 +592,12 @@ describe('报告渲染', () => {
     expect(screen.getByText(/1 个模块未完成分析/)).toBeInTheDocument()
   })
 
-  it('完成后焦点移到报告标题', async () => {
+  it('切页后焦点移到新页标题', async () => {
     await completeAnalysis()
-    expect(screen.getByRole('heading', { name: '架构报告' })).toHaveFocus()
+    // **语义随多页形态改变。** U1 之前焦点落在「架构报告」——那时它是完成态下新出现的
+    // 区块。多页形态下 R-65 要求焦点落在**新页**主标题，因为切页换掉的是一整片 DOM，
+    // 键盘与读屏用户需要知道内容变了。报告标题此刻是页内的二级标题，不是焦点目标。
+    expect(screen.getByRole('heading', { name: 'Reports', level: 1 })).toHaveFocus()
   })
 
   it('后端标记失败时呈现失败而非报告', async () => {
@@ -527,7 +608,7 @@ describe('报告渲染', () => {
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         ),
     })
-    render(<App />)
+    renderApp()
     await submitRepo()
     await screen.findByRole('heading', { name: '分析进度' })
     await emitProgress(progress({ stage: 'failed', label: '失败', failed: true }))
@@ -539,41 +620,64 @@ describe('报告渲染', () => {
 })
 
 describe('评审呈现', () => {
-  async function complete(): Promise<void> {
+  /**
+   * 跑到完成态再切到某个评审页。
+   *
+   * **一处改写在这里分成了三页。** U1 之前三类检查同屏呈现，所以「零命中与未执行可区分」
+   * 一条用例就能同时断言 structural 与 security。多页形态下每页只显示一个类别（R-30），
+   * 那条断言因此拆成两条——每条切到对应的页再断言原来那半个断言体。断言体不变，覆盖不减。
+   */
+  async function completeAndGoto(nav: string): Promise<void> {
     stubFetch({})
-    render(<App />)
+    renderApp()
     await submitRepo()
     await screen.findByRole('heading', { name: '分析进度' })
     await emitProgress(progress({ stage: 'done', label: '完成', percent: 100 }))
-    await screen.findByRole('heading', { name: '代码评审' })
+    await gotoNav(nav)
   }
 
   it('发现带严重度与位置', async () => {
-    await complete()
+    await completeAndGoto('Structural')
     expect(screen.getByText('3 个文件构成循环依赖')).toBeInTheDocument()
     expect(screen.getByText('高')).toBeInTheDocument()
   })
 
-  it('零命中与未执行可区分（R17）', async () => {
-    await complete()
-    // structural 已执行且命中 1 条；security 未执行并给出原因。
-    expect(screen.getByText('已执行，命中 1 条')).toBeInTheDocument()
+  it('已执行零命中的类别给出覆盖范围（R17）', async () => {
+    await completeAndGoto('Structural')
+    // structural 已执行且命中 1 条——命中数出现在计数行里。
+    expect(screen.getByText(/共 1 条发现/)).toBeInTheDocument()
+  })
+
+  it('未执行的类别显式说明且与零命中可区分（R17）', async () => {
+    await completeAndGoto('Security Review')
+    expect(screen.getByText('未执行')).toBeInTheDocument()
+    expect(screen.getByText('未配置 LLM provider')).toBeInTheDocument()
+    // 关键区分：未执行不得呈现为「零发现」。
+    expect(screen.getByText(/未执行不等于零发现/)).toBeInTheDocument()
+  })
+
+  it('评审执行情况表同时给出三类状态', async () => {
+    // 三类并列的呈现迁到 Reports 页的执行情况表——原「三类同屏」的覆盖由它承担。
+    await completeAndGoto('Reports')
+    expect(screen.getByText('已执行')).toBeInTheDocument()
     expect(screen.getByText('未执行')).toBeInTheDocument()
     expect(screen.getByText('未配置 LLM provider')).toBeInTheDocument()
   })
 
   it('判断依据与结论分开显示', async () => {
-    await complete()
+    await completeAndGoto('Structural')
     expect(screen.getByText('依赖图上的有向环')).toBeInTheDocument()
   })
 })
 
 describe('问答', () => {
+  /** 同上：完成态后切到 AI Chat 页，原断言体不动。 */
   async function complete(): Promise<void> {
-    render(<App />)
+    renderApp()
     await submitRepo()
     await screen.findByRole('heading', { name: '分析进度' })
     await emitProgress(progress({ stage: 'done', label: '完成', percent: 100 }))
+    await gotoNav('AI Chat')
     await screen.findByRole('heading', { name: '代码问答' })
   }
 
