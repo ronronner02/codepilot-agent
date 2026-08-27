@@ -8,10 +8,22 @@
 #                  所以看不出来，而全新安装解析到 2.1.0 直接 ModuleNotFoundError。
 #   docker         compose 构建与配置解析。拦 Dockerfile 与 compose 的回归。
 #
-# **后端测试跑两个平台，这不是冗余。** 路径逃逸的覆盖是分平台的：符号链接在 Windows 上
-# 要提权（实测 WinError 1314）所以那 2 条在 Windows 跳过；junction 是 Windows 专有机制，
-# 10 处调用点在 Linux 跳过。两者都是 reparse point、realpath 与 glob 都会穿透，任缺一侧
-# 都让「路径逃逸」这道 required 的门只关一半。
+# **后端测试跑两个平台。** 首轮 CI 实测的跳过分布（与设计时的预判不同，此处记实测值）：
+#
+#   ubuntu   957 passed / 13 skipped   跳的全是 junction —— 那是 Windows 专有机制
+#   windows  970 passed /  0 skipped   两类 reparse point 全覆盖
+#
+# Windows runner 零跳过是因为它以管理员权限跑，所以能建符号链接；而**本地开发机建不了**
+# （实测 WinError 1314，非提权会话下那 2 条符号链接测试跳过）。所以 Windows CI 这一侧
+# 恰好补上了本地拿不到的覆盖。
+#
+# 那 Linux 这一侧是否多余？不是，但理由不是路径逃逸：
+#   - 生产镜像是 python:3.13-slim，Linux 是真正要跑的平台
+#   - POSIX 的路径语义与权限模型与 Windows 不同，只在一侧跑等于只验一半
+#   - mypy 在这一侧跑
+#
+# 不因「Windows CI 恰好全覆盖」就砍掉 Linux：那是 runner 的环境属性，不是本项目能控制的
+# 契约，它日后收紧权限就会静默失去符号链接覆盖。
 name: CI
 
 on:

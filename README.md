@@ -159,10 +159,21 @@ cd frontend && npm run build  # 前端构建（含类型检查）
 | 从零装依赖 | 不用缓存装一遍再跑测试 | 依赖声明能否解析成一套可用的版本 |
 | 镜像构建 | compose config / build，加两条断言 | Dockerfile 与 compose 的回归 |
 
-**后端跑两个平台不是冗余，是路径逃逸覆盖的要求。** 符号链接在 Windows 上要提权（实测
-`WinError 1314`），那 2 条测试在 Windows 跳过；junction 是 Windows 专有机制，10 处调用点
-在 Linux 跳过。两者都是 reparse point，`realpath` 与 `glob` 都会穿透，任缺一侧都让这道门
-只关一半——本地开发在 Windows，所以 Linux 那侧只有 CI 能提供。
+**后端跑两个平台。** 首轮 CI 的实测跳过分布：
+
+| 平台 | 结果 | 跳过的是 |
+| --- | --- | --- |
+| ubuntu | 957 passed / 13 skipped | junction（Windows 专有机制） |
+| windows | 970 passed / 0 skipped | 无 |
+
+Windows runner 零跳过是因为它以管理员权限跑，所以能建符号链接——而**本地开发机建不了**
+（非提权会话下报 `WinError 1314`，那 2 条符号链接测试在本地跳过）。所以路径逃逸的两类
+reparse point 覆盖，本地拿不全而 Windows CI 拿得全。
+
+Linux 那一侧的必要性不在路径逃逸，而在：生产镜像是 `python:3.13-slim`，它是真正要跑的
+平台；POSIX 的路径语义与权限模型与 Windows 不同；mypy 在这一侧跑。不因「Windows CI 恰好
+全覆盖」就砍掉它——那是 runner 的环境属性而非本项目能控制的契约，日后收紧权限就会静默
+失去符号链接覆盖。
 
 **从零装依赖这个 job 刻意不配缓存。** 它要验的就是「依赖能否解析」，缓存复用上次的解析
 结果正好绕过要验的东西。`mcp` 的开区间缺陷（`mcp>=1.27` 解析到 2.1.0，而 2.x 移除了
