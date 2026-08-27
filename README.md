@@ -176,6 +176,13 @@ cd frontend && npm run build  # 前端构建（含类型检查）
 两条断言都做过变异验证：`BIND_ADDR=0.0.0.0` 时第一条转红，而第二条的 grep 能命中镜像层内
 的已知文本（确认不是假绿灯）。
 
+**独立的检查步骤带 `!cancelled()`，让一轮 CI 给出完整结论。** GitHub Actions 的默认行为是
+「前一步成功才跑下一步」，那会让 pytest 红时 mypy 被跳过、后端红时前端被跳过——而它们是
+互不依赖的检查，少一半结论就要再推一次才知道。首次运行踩到过这一点。
+
+例外是前端的构建步骤：`npm run build` 是 `tsc -b && vite build`，类型检查红时它必然因同一
+原因红，跑它只是把同一条错误报两遍。那里的默认行为恰好是对的。
+
 CI 里不装 `pdf` extra——weasyprint 需要 libpango 与 libharfbuzz，而未安装时导出端点走
 `pdf_unavailable` 降级路径（既定行为）。PDF 的中文渲染由容器内实跑核对：缺字体时它照样
 生成、字形是方块，单元测试断言不了字形。

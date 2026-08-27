@@ -59,7 +59,10 @@ jobs:
 
       - name: mypy
         # 只在 Linux 跑：类型检查与平台无关，跑两遍只是把同一结论算两次。
-        if: matrix.os == 'ubuntu-latest'
+        #
+        # 加 `!cancelled()`：类型错误与测试失败是两类独立问题，pytest 红时跳过 mypy 会让
+        # 一轮 CI 只给出一半结论。默认行为（前一步成功才跑）在这里是错的取舍。
+        if: ${{ matrix.os == 'ubuntu-latest' && !cancelled() }}
         run: python -m mypy backend
 
   frontend:
@@ -86,12 +89,18 @@ jobs:
         working-directory: frontend
 
       - name: 类型检查
+        # 与测试互不依赖，测试红时仍要给出类型结论。
+        if: ${{ !cancelled() }}
         run: npm run typecheck
         working-directory: frontend
 
       - name: 构建
         # 单独一步而非并进测试：构建失败与测试失败的处置完全不同，合成一步会让
         # 「哪个环节红了」要翻日志才知道。
+        #
+        # **这一步不加 `!cancelled()`**，与上面两步相反。`npm run build` 是
+        # `tsc -b && vite build`，类型检查红时它必然因同一原因红——跑它只是把同一条错误
+        # 报两遍。这里的默认行为（前一步成功才跑）恰好是对的。
         run: npm run build
         working-directory: frontend
 
@@ -126,6 +135,13 @@ jobs:
         run: python -m pytest -q -rs
 
       - name: 前端测试（全新环境）
+        # `!cancelled()` 而非默认的「前一步成功才跑」：这两套测试在本 job 里互不依赖，
+        # 后端红时跳过前端会让「只有后端在全新环境下坏」与「两边都坏」不可分辨——而这个
+        # job 的用途恰是判断全新环境缺什么，少一半信息就要再推一次才知道。
+        #
+        # 首次运行踩到过：后端因缺 __init__.py 而红，前端那步显示 skipped，于是那一轮
+        # 拿不到「前端在全新环境下是否正常」的答案。
+        if: ${{ !cancelled() }}
         run: npm test
         working-directory: frontend
 
