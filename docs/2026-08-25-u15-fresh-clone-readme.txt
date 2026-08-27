@@ -89,3 +89,38 @@ pyproject.toml/README.md/.env.example 与 frontend 源码复制到一个空目�
   本次是「复制文件到空目录 + 新建 venv」，不是从 GitHub 真的 git clone
   （仓库尚无提交，`git log` 报无提交）。差异只在取源方式，依赖解析与启动
   路径完全一致，而缺陷正是在依赖解析处抓到的。
+
+════════════════════════════════════════════════════════════════════
+更正（2026-08-27）：上面「未覆盖」一节的推断是错的
+════════════════════════════════════════════════════════════════════
+
+原文写「差异只在取源方式，依赖解析与启动路径完全一致」。这个推断不成立，而它
+恰好掩盖了一个更严重的缺陷。
+
+复制文件与 git clone 的差异不止取源方式：**复制带上未入库的文件，clone 只带
+入库的。** 而 .gitignore 的 `_*.py`（意在排除 _probe.py 那类实跑脚本）同时命中
+每一个 __init__.py，于是 16 个包标记文件加 tests/__init__.py 从首个提交起就没
+进过仓库。本次「全新环境」因为是复制，那些文件跟着过去了，所以全绿。
+
+真正的全新 clone 会撞上：
+
+  ImportError: cannot import name 'TOOL_SCHEMAS' from 'backend.tools'
+                                                     (unknown location)
+
+`(unknown location)` 表示 backend.tools 退化为 namespace package。被漏掉的不全是
+空文件——backend/tools/__init__.py 有 161 行，工具层的全部调度逻辑（TOOL_SCHEMAS、
+ToolContext、call_tool，即 KTD7 那个「内部管道与 MCP server 共用一份实现」的收口点）
+都在其中。
+
+这个缺陷是 2026-08-27 CI 首次运行抓到的：三个跑 pytest 的 job 全红，前端与镜像绿。
+修正为 .gitignore 用 `_[^_]*.py`，并把 17 个文件入库（提交 66cc211）。修后在真正的
+git clone 里跑 968 passed / 2 skipped。
+
+本记录的结论范围因此收窄：
+
+  仍然成立  依赖声明能在全新 venv 里装齐，且 mcp 开区间那个缺陷确实由此抓到
+  不再成立  「README 的本地启动步骤经全新环境走通」——那次的环境不是 clone 得来的，
+            而真正 clone 得来的环境在 2026-08-27 之前是跑不起来的
+
+教训：「差异只在 X，不影响 Y」这类推断，在验证记录里应当标为待验而非结论。本次代价
+是一个「clone 下来就跑不起来」的缺陷在仓库里存在了两天，且期间还开了 PR。
