@@ -62,6 +62,9 @@ docker compose up --build
 
 ### 本地开发
 
+需要 **Python 3.13** 与 **Node 24**，与容器镜像一致。低于此版本 `pip install` 会直接报
+`requires-python` 不满足——那是有意的：3.13 以下从未被验证过，不声称支持。
+
 ```bash
 # 后端
 pip install -e ".[dev]"
