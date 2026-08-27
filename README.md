@@ -145,6 +145,41 @@ cd frontend && npm test       # 前端测试
 cd frontend && npm run build  # 前端构建（含类型检查）
 ```
 
+### CI
+
+`.github/workflows/ci.yml`，push 到 main 与所有 PR 触发，四个 job 并行。
+
+| job | 跑什么 | 拦的是什么 |
+| --- | --- | --- |
+| 后端 (ubuntu / windows) | pytest；mypy 只在 ubuntu | 逻辑回归。两个平台都跑的理由见下 |
+| 前端 | test / typecheck / build | 组件行为、类型、构建 |
+| 从零装依赖 | 不用缓存装一遍再跑测试 | 依赖声明能否解析成一套可用的版本 |
+| 镜像构建 | compose config / build，加两条断言 | Dockerfile 与 compose 的回归 |
+
+**后端跑两个平台不是冗余，是路径逃逸覆盖的要求。** 符号链接在 Windows 上要提权（实测
+`WinError 1314`），那 2 条测试在 Windows 跳过；junction 是 Windows 专有机制，10 处调用点
+在 Linux 跳过。两者都是 reparse point，`realpath` 与 `glob` 都会穿透，任缺一侧都让这道门
+只关一半——本地开发在 Windows，所以 Linux 那侧只有 CI 能提供。
+
+**从零装依赖这个 job 刻意不配缓存。** 它要验的就是「依赖能否解析」，缓存复用上次的解析
+结果正好绕过要验的东西。`mcp` 的开区间缺陷（`mcp>=1.27` 解析到 2.1.0，而 2.x 移除了
+`mcp.server.fastmcp`）就是本机装着旧版所以看不出来，只在全新安装时才暴露。
+
+镜像那个 job 的两条断言值得单独说，它们验的是设计而非「能构建」：
+
+- **默认绑定必须仍是 `127.0.0.1`**。后端没有鉴权层且能克隆任意仓库、消耗 LLM 额度，默认
+  对外可达的后果比构建失败严重得多。断言读 `docker compose config` 的 `host_ip`。
+- **镜像层内不得有 `.env` 的值**。该 job 会在仓库根造一份只含占位 key 的 `.env`（compose
+  用 `env_file` 读它），所以这正是最该查的时机：若日后有人在 Dockerfile 里加 `COPY . .`，
+  这条就会红。
+
+两条断言都做过变异验证：`BIND_ADDR=0.0.0.0` 时第一条转红，而第二条的 grep 能命中镜像层内
+的已知文本（确认不是假绿灯）。
+
+CI 里不装 `pdf` extra——weasyprint 需要 libpango 与 libharfbuzz，而未安装时导出端点走
+`pdf_unavailable` 降级路径（既定行为）。PDF 的中文渲染由容器内实跑核对：缺字体时它照样
+生成、字形是方块，单元测试断言不了字形。
+
 ## 公网部署
 
 默认形态是本地单用户。对外开放要先理解四件事，它们不是可选步骤。

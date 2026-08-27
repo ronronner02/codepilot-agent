@@ -1,0 +1,204 @@
+# CI：单元测试与类型检查、从零装依赖、镜像构建。
+#
+# 三组 job 各自拦不同类的回归，互不替代：
+#
+#   test           带缓存跑三套门（pytest / mypy / npm）。每次 push 都跑，是主门。
+#   fresh-install  不用缓存、按 README 的步骤从零装。拦的是「依赖声明能不能解析成一套
+#                  可用的版本」——mcp 那个开区间缺陷正是这条路径抓到的：本机装的是 1.27
+#                  所以看不出来，而全新安装解析到 2.1.0 直接 ModuleNotFoundError。
+#   docker         compose 构建与配置解析。拦 Dockerfile 与 compose 的回归。
+#
+# **后端测试跑两个平台，这不是冗余。** 路径逃逸的覆盖是分平台的：符号链接在 Windows 上
+# 要提权（实测 WinError 1314）所以那 2 条在 Windows 跳过；junction 是 Windows 专有机制，
+# 10 处调用点在 Linux 跳过。两者都是 reparse point、realpath 与 glob 都会穿透，任缺一侧
+# 都让「路径逃逸」这道 required 的门只关一半。
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # 手动触发。排查「是不是环境问题」时不必先造一个空提交。
+  workflow_dispatch:
+
+# 同一分支的新 push 取消旧运行。分钟数不是约束（仓库公开），但排队会让反馈变慢，
+# 而已被新提交取代的那次运行的结论已经没有意义。
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: 后端 (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # 不 fail-fast：两个平台的失败原因往往不同（路径分隔符、reparse point 机制），
+      # 一侧红就掐掉另一侧会让「只有 Windows 挂」与「两边都挂」不可分辨。
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          # 与 backend/Dockerfile 的 python:3.13-slim 对齐。pyproject 声明 >=3.11，
+          # 但 CI 该跑生产实际用的那个版本。
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: 装依赖
+        # 不装 pdf extra：weasyprint 需要 libpango 与 libharfbuzz 两个系统库，而导出端点
+        # 未安装时走 pdf_unavailable 降级路径（既定行为，非缺陷）。PDF 的实际渲染由容器内
+        # 实跑核对，不由单元测试证明——缺字体时它照样生成、字形是方块，测试断言不了字形。
+        run: pip install -e ".[dev]"
+
+      - name: pytest
+        run: python -m pytest -q -rs
+
+      - name: mypy
+        # 只在 Linux 跑：类型检查与平台无关，跑两遍只是把同一结论算两次。
+        if: matrix.os == 'ubuntu-latest'
+        run: python -m mypy backend
+
+  frontend:
+    name: 前端
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # 与 frontend/Dockerfile 的 node:24-alpine 对齐。
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: 装依赖
+        # ci 而非 install：install 会在锁文件与 package.json 不一致时改锁文件，
+        # 那让 CI 的依赖树可能不同于本地那一份。
+        run: npm ci
+        working-directory: frontend
+
+      - name: 测试
+        run: npm test
+        working-directory: frontend
+
+      - name: 类型检查
+        run: npm run typecheck
+        working-directory: frontend
+
+      - name: 构建
+        # 单独一步而非并进测试：构建失败与测试失败的处置完全不同，合成一步会让
+        # 「哪个环节红了」要翻日志才知道。
+        run: npm run build
+        working-directory: frontend
+
+  fresh-install:
+    name: 从零装依赖
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          # **刻意不配 cache。** 这个 job 的全部价值在于「依赖声明能不能解析成一套可用的
+          # 版本」，而缓存会让它复用上次解析的结果——那正好绕过要验的东西。
+          # mcp 的开区间缺陷（`mcp>=1.27` 解析到 2.1.0 而 2.x 移除了 mcp.server.fastmcp）
+          # 就是本机装着旧版所以看不出来，只在全新安装时才暴露。
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: 按 README 步骤装后端
+        run: pip install -e ".[dev]"
+
+      - name: 按 README 步骤装前端
+        # 用 install 而非 ci：这一步要验的是 package.json 的声明本身可解析，
+        # 而 ci 严格照锁文件装，等于跳过解析。
+        run: npm install
+        working-directory: frontend
+
+      - name: 后端测试（全新环境）
+        run: python -m pytest -q -rs
+
+      - name: 前端测试（全新环境）
+        run: npm test
+        working-directory: frontend
+
+      - name: 报告实际装到的版本
+        # 失败时最需要知道的就是「解析到了哪个版本」。装的过程刷屏，单独打一份摘要
+        # 便于与 pyproject 的约束对照。
+        if: always()
+        run: |
+          echo "## 实际解析到的版本" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          pip show mcp langgraph openai chromadb 2>/dev/null | grep -E '^(Name|Version)' >> "$GITHUB_STEP_SUMMARY" || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+  docker:
+    name: 镜像构建
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: 造一份最小 .env
+        # compose 用 env_file 读 .env，缺文件时 config 与 build 都失败。CI 里不该有真实
+        # 凭证，所以造一份只含必填项的占位。deepseek_api_key 是 Settings 的唯一必填字段，
+        # 而构建与配置解析都不会用它发请求。
+        #
+        # 这份文件只存在于 runner 上：仓库的 .gitignore 排除了 .env，此处也不会被提交。
+        run: echo "DEEPSEEK_API_KEY=ci-placeholder-not-used" > .env
+
+      - name: compose 配置解析
+        # 放在 build 之前：解析失败是秒级发现的，而构建要几分钟。先跑快的那个。
+        run: docker compose config --quiet
+
+      - name: 默认绑定必须仍是 127.0.0.1
+        # KTD9 的默认值不能被改动悄悄破坏——默认对外可达等于把一个无鉴权、能克隆任意仓库
+        # 并消耗 LLM 额度的服务暴露到公网。这条断言比「compose 能解析」重要得多。
+        run: |
+          published=$(docker compose config --format json | python -c "
+          import json,sys
+          cfg=json.load(sys.stdin)
+          for name, svc in cfg['services'].items():
+              for port in svc.get('ports', []):
+                  print(f\"{name} {port.get('host_ip','')}\")
+          ")
+          echo "$published"
+          if echo "$published" | grep -v '127.0.0.1' | grep -q '[0-9]'; then
+            echo "::error::存在非 127.0.0.1 的默认绑定，见上面的清单"
+            exit 1
+          fi
+
+      - name: 构建镜像
+        # **无跨运行层缓存，每次都是全量构建**（后端镜像约 1.29GB，实测本机数分钟）。
+        #
+        # 不接 GHA 缓存是权衡后的结果：`docker compose build` 要用上 `cache-from`/`cache-to`
+        # 得给每个 service 单独配 `build.cache_from`，那会把 CI 的关注点写进 compose 文件
+        # ——而那个文件同时是用户的本地启动入口。为省几分钟把部署配置搞复杂不值得，这个 job
+        # 也不在每次 push 的关键路径上（它与其余三个 job 并行）。
+        #
+        # COMPOSE_BAKE 让 compose 走 bake 后端构建，两个镜像因此并行而非依次。
+        run: docker compose build
+        env:
+          COMPOSE_BAKE: "true"
+
+      - name: 镜像层内不得有密钥
+        # .dockerignore 排除 .env、compose 用 env_file 在运行时注入——这条断言是那两处
+        # 设计的验证。上一步刚在仓库根造了 .env，所以此刻正是最该查的时机：若 Dockerfile
+        # 里有人加了 COPY . .，这里就会红。
+        run: |
+          for image in $(docker compose config --images); do
+            echo "检查 $image"
+            if docker history --no-trunc "$image" | grep -q 'ci-placeholder-not-used'; then
+              echo "::error::$image 的构建历史含 .env 的值"
+              exit 1
+            fi
+          done
+          echo "两个镜像的构建历史均不含 .env 的值"
