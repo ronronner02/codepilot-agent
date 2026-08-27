@@ -9,6 +9,12 @@ Python 的包布局），不属于单文件解析。
   - 未解析：看起来指向仓库内却找不到文件。说明解析规则有缺口，记入 unresolved
     并附原因——静默丢弃会让依赖图的残缺伪装成「本来就没有这条依赖」。
   - 自环：文件导入自己（barrel 再导出自身时会出现）。丢弃，不入图。
+
+**边分两种口径，只在环检测上分叉。** 延迟导入（函数体内）与类型保护导入
+（`if TYPE_CHECKING:` 内）都是真实的依赖关系，故照常入 edges——中心度、聚类、
+「谁依赖谁」的架构结论都应当算它们。但它们在导入期不执行，所以由它们支撑的边不参与
+环检测：`a -> b -> a` 里只要有一条是延迟导入，导入期就没有这个环，报成循环依赖是误报
+（见 ImportScope 的说明与那次 fastapi 实跑）。这类环归入 call_time_cycles。
 """
 
 from __future__ import annotations
@@ -364,6 +370,12 @@ def build_graph(
     aliases, base_url = _load_ts_aliases(repo_root)
 
     edges: dict[str, set[str]] = {path: set() for path in paths}
+    # 导入期边：只累积由模块级 import 支撑的边。环检测跑在它上面。
+    #
+    # 为什么要两份而不是给边打标记：一条边可能由多条 import 支撑（同一文件里既有顶层
+    # `from m import a` 又有函数内 `from m import b`），此时它在导入期确实存在。用
+    # 「累积两个集合再相减」表达这一点是最直接的——差集恰好是「只由延迟导入支撑的边」。
+    import_time_edges: dict[str, set[str]] = {path: set() for path in paths}
     external: dict[str, set[str]] = {}
     unresolved: list[UnresolvedImport] = []
 
@@ -390,16 +402,53 @@ def build_graph(
 
             # 自环丢弃。包的 __init__.py 导入自身子模块、或 barrel 再导出自身时会
             # 出现，入图会让中心度与环检测都失真。
-            edges[file.path].update(t for t in resolved if t != file.path)
+            targets = {t for t in resolved if t != file.path}
+            edges[file.path].update(targets)
+            if ref.scope.at_import_time:
+                import_time_edges[file.path].update(targets)
+
+    deferred = {
+        source: frozenset(targets - import_time_edges[source])
+        for source, targets in edges.items()
+        if targets - import_time_edges[source]
+    }
+    all_cycles = find_cycles(paths, edges)
+    import_cycles, call_time_cycles = _partition_cycles(all_cycles, import_time_edges)
 
     return DependencyGraph(
         nodes=tuple(paths),
         edges={node: frozenset(targets) for node, targets in edges.items()},
         external={target: frozenset(sources) for target, sources in external.items()},
         unresolved=tuple(unresolved),
-        cycles=find_cycles(paths, edges),
+        cycles=import_cycles,
+        call_time_cycles=call_time_cycles,
+        deferred_edges=deferred,
         granularity=Granularity.FILE,
     )
+
+
+def _partition_cycles(
+    cycles: tuple[tuple[str, ...], ...], import_time_edges: dict[str, set[str]]
+) -> tuple[tuple[tuple[str, ...], ...], tuple[tuple[str, ...], ...]]:
+    """把全部有向环分成「导入期成立」与「仅调用期成立」两组。
+
+    判据是逐边核对：环上每条边都在导入期存在，这个环才在导入期成立；**任一条边是延迟
+    导入即不成立**——Python 在模块加载时只求值顶层 import，环上缺一条边就断了。
+
+    为什么不在导入期子图上重跑一次 find_cycles：那样得到的两组环无法对应。同一个环
+    从不同起点进入 DFS 会得到不同的规范表示，两次独立检测的结果做差集会漏掉或重复。
+    在全图的环上逐边判定则是精确的——每个环各自定性一次，不依赖遍历顺序。
+    """
+    at_import: list[tuple[str, ...]] = []
+    at_call: list[tuple[str, ...]] = []
+    for cycle in cycles:
+        # 环是首尾相接的，最后一条边从末节点回到首节点。
+        pairs = zip(cycle, cycle[1:] + cycle[:1])
+        if all(target in import_time_edges.get(source, set()) for source, target in pairs):
+            at_import.append(cycle)
+        else:
+            at_call.append(cycle)
+    return tuple(at_import), tuple(at_call)
 
 
 def _build_directory_graph(
@@ -427,7 +476,10 @@ def _build_directory_graph(
 
 
 def find_cycles(nodes: list[str], edges: dict[str, set[str]]) -> tuple[tuple[str, ...], ...]:
-    """找出有向环。
+    """找出有向环。**不区分导入期与调用期**——传什么边集就在什么图上找环。
+
+    导入期/调用期的分野由调用方负责：`build_graph` 用全部边找环，再交
+    `_partition_cycles` 逐边定性。这里保持纯图算法，不引入 import 语义。
 
     用迭代式 DFS 而非递归：深依赖链在千文件仓库上能到几百层，递归会撞
     Python 的栈上限（默认 1000），而这属于「病态结构不应压垮系统」的范围。

@@ -96,6 +96,42 @@ class TestKeyInvalidation:
         assert left.digest != right.digest
 
 
+class TestIndexScope:
+    """索引覆盖范围。
+
+    抽样索引与全量索引在检索时表现相同——都返回结果，只是抽样那份漏内容且不报错。
+    所以它必须进键，否则一次抽样分析之后的全量分析会命中残缺索引。
+    """
+
+    def test_sampled_scope_changes_key(self) -> None:
+        assert _key().digest != _key(index_scope="top200").digest
+
+    def test_different_sample_sizes_differ(self) -> None:
+        """抽 200 与抽 500 的索引内容不同，不能互相命中。"""
+        assert _key(index_scope="top200").digest != _key(index_scope="top500").digest
+
+    def test_full_index_digest_unchanged_by_new_field(self) -> None:
+        """全量索引的 digest 必须与引入该字段之前一致，否则升级即让已建索引全失效。
+
+        写死期望值而非与「四段拼接」的重算对比：重算会跟着实现一起变，钉不住这条约束。
+        这个值取自加字段之前的实现输出（四段拼接后取 sha256 前 16 位）。
+        """
+        assert _key().digest == "f6924a78a1842a65"
+
+    def test_empty_scope_equals_omitted_scope(self) -> None:
+        assert _key(index_scope="").digest == _key().digest
+
+    def test_describe_shows_scope_only_when_sampled(self) -> None:
+        assert "scope" not in _key().describe()
+        assert "scope=top200" in _key(index_scope="top200").describe()
+
+    def test_differences_reports_scope_change(self) -> None:
+        diffs = _key(index_scope="top200").differences(_key())
+        assert len(diffs) == 1
+        assert "索引范围" in diffs[0]
+        assert "全量" in diffs[0]
+
+
 class TestDiagnostics:
     def test_describe_lists_all_components(self) -> None:
         """排查「为什么没命中」时要能逐项对比，只有哈希看不出是哪项变了。"""

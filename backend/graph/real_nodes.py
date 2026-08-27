@@ -17,7 +17,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from backend.cache.key import build_cache_key
+from backend.cache.key import build_cache_key, index_scope_label
 from backend.cache.manager import check_cache, write_manifest
 from backend.config import Settings
 from backend.graph.builder import NodeSet
@@ -76,6 +76,37 @@ def collect_repo_files(workdir: Path) -> list[str]:
         for path in workdir.rglob("*")
         if path.is_file() and not (SKIP_DIRS & set(path.relative_to(workdir).parts))
     ]
+
+
+def select_index_files(
+    rel_paths: list[str], centrality_scores: dict[str, float], max_files: int
+) -> tuple[list[str], str]:
+    """挑选送进向量索引的文件。返回 (路径列表, 抽样说明)。
+
+    `max_files <= 0` 或文件数未超上限时返回全量，说明为空串——全量是默认路径，不该在
+    产出里多一句话。
+
+    **抽样按中心度降序，不按路径序。** 中心度是 PageRank（cluster 已算好），高分文件是
+    「被广泛且被重要者依赖」的那些，也恰是问答最可能问到的。路径序则完全任意——按它抽样
+    等于让检索质量取决于目录命名。
+
+    并列与缺失都用路径名兜底排序，使结果可复现：同一份输入每次抽出同一批文件，否则缓存
+    键相同而索引内容不同，命中的会是上一次抽中的那批。缺失中心度的文件按 0 分处理——
+    它们是解析出来但未进图的文件（例如图降级为目录级时全部文件都没有分数），此时退化为
+    路径序，仍然确定。
+    """
+    if max_files <= 0 or len(rel_paths) <= max_files:
+        return list(rel_paths), ""
+
+    ranked = sorted(rel_paths, key=lambda p: (-centrality_scores.get(p, 0.0), p))
+    selected = ranked[:max_files]
+    note = (
+        f"按中心度抽样索引 {len(selected)} / {len(rel_paths)} 个文件"
+        f"（MAX_INDEX_FILES={max_files}），未索引的文件检索不到"
+    )
+    # 返回时恢复原顺序：切块产出的片段顺序影响不了正确性，但让日志与产出可比。
+    chosen = set(selected)
+    return [p for p in rel_paths if p in chosen], note
 
 
 def _repo_slug(repo_url: str) -> str:
@@ -204,18 +235,26 @@ def make_real_nodes(settings: Settings, provider: LLMProvider | None = None) -> 
         outcome = state["parse_outcome"]
         embedding = build_embedding_provider(settings)
 
+        scope_label = index_scope_label(settings.max_index_files)
         key = build_cache_key(
             repo=_repo_slug(state.get("repo_url", "")),
             commit_sha=state.get("commit_sha", ""),
             provider_identity=embedding.identity,
+            index_scope=scope_label,
         )
         store = VectorStore(settings.index_dir, key.digest)
         status = check_cache(settings.index_dir, key, store.exists(), store.count())
 
+        rel_paths, sampling_note = select_index_files(
+            [f.path for f in outcome.parsed],
+            state.get("centrality") or {},
+            settings.max_index_files,
+        )
+
         # 命中检查在索引之前，且不调 embedding——AE3 要求二次提交不重复产生成本。
         result = await build_index(
             repo_root=workdir,
-            rel_paths=[f.path for f in outcome.parsed],
+            rel_paths=rel_paths,
             cache_key=key,
             provider=embedding,
             index_dir=settings.index_dir,
@@ -227,6 +266,9 @@ def make_real_nodes(settings: Settings, provider: LLMProvider | None = None) -> 
             write_manifest(settings.index_dir, key, result.chunk_count)
 
         note = f"{status.reason}；{result.note}"
+        if sampling_note:
+            # 抽样必须落在产出说明里：检索漏内容不报错，读者要能知道索引是残缺的。
+            note += f"；{sampling_note}"
         if result.failed_batches:
             note += f"（失败批次：{result.failed_batches[0]}）"
 

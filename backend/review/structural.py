@@ -5,10 +5,15 @@
 
 四项检查与各自的确定依据：
 
-  循环依赖    graph.cycles，U4 的迭代式 DFS 已算出
+  循环依赖    graph.cycles，U4 的迭代式 DFS 已算出（**仅导入期成立的环**）
   层级违规    两个模块间的支配方向被少数反向边违反
   超大模块    模块文件数超阈值
   无引用文件  图上零入度且非入口点
+
+**循环依赖只报导入期成立的环。** 延迟导入（函数体内）与 TYPE_CHECKING 保护导入在
+导入期不执行，由它们支撑的环在导入期不存在。此前不作区分，于是在 fastapi 上报出一个
+「3 文件循环依赖」而其中 2 条边是函数作用域的延迟导入——那恰恰是作者用来打破循环的
+手段。这类环现在归入 graph.call_time_cycles，只计数不报出。
 
 **符号级死代码做不到，这里只做文件级。** R15 提到「死代码」，理想判据是「定义了但无处
 引用的符号」。但 U3 的解析层只提取定义与 import 声明，不提取调用点——判断一个函数有没
@@ -54,6 +59,10 @@ def check_cycles(graph: DependencyGraph) -> list[Finding]:
 
     严重度按环的长度分：两文件互相导入常是有意的（类型与实现分置），而跨越 4 个以上
     文件的环通常是分层失控，重构成本也高得多。
+
+    **只报导入期成立的环。** `graph.cycles` 已收窄为这一类，仅调用期成立的环在
+    `graph.call_time_cycles` 里，由 run_structural_checks 计入范围说明而不逐条报出
+    （理由见该处与 ImportScope 的说明）。
     """
     findings: list[Finding] = []
     for cycle in graph.cycles:
@@ -242,12 +251,29 @@ def run_structural_checks(
 
     unreferenced = count_unreferenced_files(graph, entrypoints)
 
+    # 仅调用期成立的环只计数，不逐条报出。
+    #
+    # 与「无引用文件」同一取舍，但成因不同：那个是误报率高，这个是**报出来通常是好
+    # 设计**——环上那条延迟导入正是作者用来打破导入期循环的手段。把它列进问题清单会
+    # 让读者去"修"一处本就正确的规避措施。计数保留，因为「有 4 处这样的规避」对读者
+    # 是有意义的规模信息（另见那次 fastapi 实跑：报告的依赖关系一节把同一处正确描述
+    # 为规避例证，而评审报成循环依赖，两处口径矛盾）。
+    call_time_note = ""
+    if graph.call_time_cycles:
+        call_time_note = (
+            f"另有 {len(graph.call_time_cycles)} 处环仅在调用期成立"
+            f"（环上含函数作用域的延迟导入或 TYPE_CHECKING 保护导入，导入期不构成环），"
+            f"通常是作者主动规避循环依赖的手段，未逐条列出；"
+        )
+
     return CategoryOutcome(
         category=FindingCategory.STRUCTURAL,
         status=CheckStatus.EXECUTED,
         scope=(
             f"{len(graph.nodes)} 个文件、{len(modules)} 个模块；"
-            f"检查项：循环依赖、层级违规、超大模块（>{max_module_files} 文件）。"
+            f"检查项：循环依赖（仅导入期成立的环）、层级违规、"
+            f"超大模块（>{max_module_files} 文件）。"
+            f"{call_time_note}"
             f"另有 {unreferenced} 个文件无仓库内导入方（多为测试、配置与工具链入口，"
             f"其调用方在仓库之外），因误报率过高未逐条列出；"
             f"符号级死代码需调用点分析，当前解析层不支持"

@@ -7,11 +7,14 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import time
+from typing import Any
 
-from backend.graph.builder import build_analysis_graph, fanout_router
-from backend.graph.observability import configure_tracing, summarize
-from backend.graph.state import AnalysisState, ModulePlan
+from backend.graph.builder import NodeSet, build_analysis_graph, fanout_router
+from backend.graph.observability import configure_tracing, observed, summarize
+from backend.graph.state import AnalysisState, ModuleAnalysis, ModulePlan, ModuleTask
 from backend.graph.stub_nodes import make_stub_nodes
 from backend.static_analysis.models import Module
 from tests.support import make_settings as _settings
@@ -54,7 +57,7 @@ class TestConnectivity:
         assert result["index_identity"] == "stub-provider/stub-model/v1"
 
     def test_all_three_branches_execute(self) -> None:
-        """cluster 之后的三条分支都要跑到——漏一条表现为「某份产出缺失」而非报错。"""
+        """三条分支都要跑到——漏一条表现为「某份产出缺失」而非报错。"""
         nodes = {e.node for e in _run()["events"]}
         assert {"synthesize", "reviewer", "chunk_and_index"} <= nodes
 
@@ -64,6 +67,125 @@ class TestConnectivity:
         assert order.index("cluster") < order.index("planner")
         assert order.index("planner") < order.index("synthesize")
         assert order.index("select_files") < order.index("reviewer")
+        # 索引挂在 planner 之后（调度决定，见 builder 的说明）。
+        assert order.index("planner") < order.index("chunk_and_index")
+
+
+class TestIndexRunsAlongsideFanout:
+    """索引与模块扇出必须并行。
+
+    针对的是实测暴露的串行：索引曾挂在 cluster 之后，与 planner 同属一个 superstep，
+    于是模块扇出要等索引跑完才启动——fastapi 上是干等 30.5 分钟，实测表现为「索引跑完前
+    chat 调用一直停在 2 次」。
+
+    **断言落在并发这个属性上，不落在边的形状上。** 只断言「有 planner -> chunk_and_index
+    这条边」证明不了并发——superstep 的排布才是决定性的，而那取决于全部边的拓扑。所以这里
+    让索引节点占住一段可观测的时间，再核对扇出是否在这段时间内启动。
+    """
+
+    def _timed_nodes(self, delay: float, log: list[tuple[str, str, float]]) -> NodeSet:
+        """一套记录起止时刻的节点集。索引节点故意慢，扇出节点只记时刻。
+
+        **五个节点全部改成异步**，而非只替换这两个。同步节点会被 LangGraph 丢进线程池
+        执行（这也是真实节点集全 async 的理由，见 real_nodes 的说明），混用会让"谁与谁
+        并行"取决于线程池调度而非 superstep 排布——那样这条测试断言的就不是拓扑了。
+        """
+        base = make_stub_nodes(module_count=3)
+
+        @observed("chunk_and_index")
+        async def slow_index(state: AnalysisState) -> dict[str, Any]:
+            log.append(("chunk_and_index", "start", time.perf_counter()))
+            await asyncio.sleep(delay)
+            log.append(("chunk_and_index", "end", time.perf_counter()))
+            return {"indexed_chunks": 0, "index_identity": "stub-provider/stub-model/v1"}
+
+        @observed("module_agent", scope_key="module")
+        async def timed_module(state: ModuleTask) -> dict[str, Any]:
+            log.append(("module_agent", "start", time.perf_counter()))
+            module = state["module"]
+            return {
+                "module_analyses": [
+                    ModuleAnalysis(module_name=module.name, summary="stub", cited_paths=())
+                ]
+            }
+
+        @observed("planner")
+        async def planner(state: AnalysisState) -> dict[str, Any]:
+            return base.planner(state)  # type: ignore[return-value]
+
+        @observed("select_files")
+        async def select_files(state: AnalysisState) -> dict[str, Any]:
+            return base.select_files(state)  # type: ignore[return-value]
+
+        @observed("reviewer")
+        async def reviewer(state: AnalysisState) -> dict[str, Any]:
+            return base.reviewer(state)  # type: ignore[return-value]
+
+        @observed("synthesize")
+        async def synthesize(state: AnalysisState) -> dict[str, Any]:
+            return base.synthesize(state)  # type: ignore[return-value]
+
+        @observed("ingest")
+        async def ingest(state: AnalysisState) -> dict[str, Any]:
+            return base.ingest(state)  # type: ignore[return-value]
+
+        @observed("parse")
+        async def parse(state: AnalysisState) -> dict[str, Any]:
+            return base.parse(state)  # type: ignore[return-value]
+
+        @observed("cluster")
+        async def cluster(state: AnalysisState) -> dict[str, Any]:
+            return base.cluster(state)  # type: ignore[return-value]
+
+        return NodeSet(
+            ingest=ingest,
+            parse=parse,
+            cluster=cluster,
+            planner=planner,
+            module_agent=timed_module,
+            synthesize=synthesize,
+            select_files=select_files,
+            reviewer=reviewer,
+            chunk_and_index=slow_index,
+        )
+
+    async def test_fanout_starts_before_index_finishes(self) -> None:
+        """扇出必须在索引结束**之前**启动。
+
+        判据只取上界，不取区间。两者同属一个 superstep，被并发调度到同一时刻（实测三路
+        扇出与索引的 start 在浮点精度上就是同一个值，先后不定），所以「扇出晚于索引起点」
+        不是并行的含义，写成区间会让这条测试随调度顺序随机红绿。
+
+        串行排布下 module_agent 的 start 会全部晚于 chunk_and_index 的 end——这条断言
+        就是那个缺陷的直接反面。索引故意慢 0.3s，让两种排布的差别远大于调度噪声。
+        """
+        log: list[tuple[str, str, float]] = []
+        graph = build_analysis_graph(self._timed_nodes(0.3, log))
+        await graph.ainvoke({"repo_url": "https://github.com/o/r"}, THREAD)
+
+        index_end = next(t for n, phase, t in log if n == "chunk_and_index" and phase == "end")
+        module_starts = [t for n, phase, t in log if n == "module_agent" and phase == "start"]
+
+        assert module_starts, "扇出未执行"
+        assert all(t < index_end for t in module_starts), (
+            f"模块扇出未与索引并行：索引结束于 {index_end:.3f}，"
+            f"而扇出启动于 {[f'{t:.3f}' for t in module_starts]}"
+        )
+
+    async def test_index_still_completes_before_graph_ends(self) -> None:
+        """并行不等于放弃等待：整图结束时索引的产出必须已在 state 里。"""
+        log: list[tuple[str, str, float]] = []
+        graph = build_analysis_graph(self._timed_nodes(0.1, log))
+        result = await graph.ainvoke({"repo_url": "https://github.com/o/r"}, THREAD)
+
+        assert result["index_identity"] == "stub-provider/stub-model/v1"
+        assert any(n == "chunk_and_index" and phase == "end" for n, phase, _ in log)
+
+    def test_index_runs_even_when_no_modules_planned(self) -> None:
+        """零扇出时索引仍要执行——它挂在 planner 之后，而路由的空列表只影响扇出分支。"""
+        result = _run(module_count=0)
+        assert result["index_identity"] == "stub-provider/stub-model/v1"
+        assert any(e.node == "chunk_and_index" for e in result["events"])
 
     def test_runs_without_checkpointer(self) -> None:
         graph = build_analysis_graph(make_stub_nodes(2), checkpointer=False)

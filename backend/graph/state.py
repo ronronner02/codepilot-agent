@@ -12,10 +12,11 @@ state 字段设计是本单元的核心。判据只有一条：**这个字段会
 
 本图有两处并发写入：
   1. 模块子 Agent 扇出（KTD2 的 `Send`）——同一节点被并行调度多次。
-  2. cluster 之后的三条分支（报告 / 评审 / 索引）并行执行。
+  2. 同一 superstep 内的多个节点并行执行。当前排布下是 module_agent(×N) + reviewer +
+     chunk_and_index 同属一个 superstep（见 builder 的拓扑说明），三者都写 events。
 
-所以 module_analyses、module_failures（第 1 处）与 events（第 2 处，三条分支都写）
-带 reducer；其余字段各由单一节点产出，用覆盖语义。
+所以 module_analyses、module_failures（第 1 处）与 events（第 2 处）带 reducer；
+其余字段各由单一节点产出，用覆盖语义。
 """
 
 from __future__ import annotations

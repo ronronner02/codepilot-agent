@@ -722,6 +722,7 @@ def _graph_model(state: dict[str, Any]) -> DependencyGraphModel | None:
             for item in graph.unresolved
         ],
         cycles=[list(cycle) for cycle in graph.cycles],
+        call_time_cycles=[list(cycle) for cycle in graph.call_time_cycles],
         granularity=graph.granularity.value,
         # None 转空串：可选字段在 JSON 里出现两种「没有」（缺键与 null）会让前端多写
         # 一个分支，而这里的语义只有「有原因」与「没原因」。

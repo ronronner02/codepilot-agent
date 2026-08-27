@@ -144,6 +144,7 @@ export function fullResult(overrides: Partial<AnalysisResult> = {}): AnalysisRes
         { target: '.legacy', path: 'core/app.py', line: 9, reason: '未找到对应文件' },
       ],
       cycles: [],
+      call_time_cycles: [],
       granularity: 'file',
       degraded_reason: '',
     },

@@ -208,7 +208,11 @@ export interface DependencyGraphInfo {
   external: Record<string, string[]>
   /** 指向仓库内却没解析到的 import。与 external 区分：这是解析规则的缺口。 */
   unresolved: UnresolvedImport[]
+  /** 导入期成立的环。延迟导入构成的环不在其中，见 call_time_cycles。 */
   cycles: string[][]
+  /** 仅调用期成立的环：环上有函数作用域的延迟导入，导入期不成立。
+   *  通常是作者主动规避循环依赖的手段，不是问题。 */
+  call_time_cycles: string[][]
   granularity: string
   /** 非空表示已降级为目录级粒度，界面须显式标注（R-13）。 */
   degraded_reason: string

@@ -246,6 +246,102 @@ class TestCycles:
         assert _graph(ts_repo).cycles == ()
 
 
+class TestImportTimeVsCallTime:
+    """导入期环与调用期环的分野。
+
+    这一组针对的是端到端实跑暴露的误报：fastapi 上报出
+    `_compat/v2.py -> params.py -> datastructures.py -> _compat/v2.py`，而其中两条边是
+    函数作用域的延迟导入——导入期不存在这个环。下面第一条测试就是那个形态的最小复现。
+    """
+
+    def test_deferred_import_breaks_import_time_cycle(self, tmp_path: Path) -> None:
+        """三文件环里有一条是函数内延迟导入：不算循环依赖，归入调用期环。
+
+        这是 fastapi 那次误报的最小复现，边的形态照抄实测结论：两条顶层导入
+        （`params.py:16` 那一条是其中之一）加一条函数作用域的延迟导入，作者正是用后者
+        打破导入期的环。
+
+        环上只放一条延迟边而非两条：两条时 compat 与 data 之间会另成一个两文件环，而
+        find_cycles 命中它就把两个节点标记为已完成，三文件环再也走不到——那会让这条
+        测试断言的是另一个形态。
+        """
+        root = tmp_path / "deferred_ring"
+        _write(root, "compat.py", "from params import P\n")
+        _write(root, "params.py", "from data import D\n")
+        _write(root, "data.py", "def f():\n    from compat import C\n    return C\n")
+        graph = _graph(root)
+
+        assert graph.cycles == (), f"导入期不应有环，实际：{graph.cycles}"
+        assert len(graph.call_time_cycles) == 1
+        assert set(graph.call_time_cycles[0]) == {"compat.py", "params.py", "data.py"}
+        # 打破环的那条边可被指出——报告要能解释「为什么这个环不成立」。
+        assert graph.deferred_edges == {"data.py": frozenset({"compat.py"})}
+
+    def test_deferred_edge_still_present_in_graph(self, tmp_path: Path) -> None:
+        """延迟导入仍是真实依赖，照常入 edges——中心度与聚类都该算它。"""
+        root = tmp_path / "deferred_edge"
+        _write(root, "a.py", "def use():\n    from b import x\n    return x\n")
+        _write(root, "b.py", "x = 1\n")
+        graph = _graph(root)
+
+        assert graph.edges["a.py"] == frozenset({"b.py"})
+        assert graph.deferred_edges["a.py"] == frozenset({"b.py"})
+
+    def test_top_level_cycle_still_reported(self, tmp_path: Path) -> None:
+        """全部为顶层导入的环仍是导入期环——收窄语义不该把真环也放过。"""
+        root = tmp_path / "toplevel_ring"
+        _write(root, "a.py", "from b import x\n")
+        _write(root, "b.py", "from a import y\n")
+        graph = _graph(root)
+
+        assert len(graph.cycles) == 1
+        assert set(graph.cycles[0]) == {"a.py", "b.py"}
+        assert graph.call_time_cycles == ()
+
+    def test_edge_with_both_import_forms_counts_as_import_time(self, tmp_path: Path) -> None:
+        """同一对文件间既有顶层导入又有延迟导入时，该边在导入期确实存在。"""
+        root = tmp_path / "mixed_edge"
+        _write(root, "a.py", "from b import x\n\n\ndef late():\n    from b import y\n    return y\n")
+        _write(root, "b.py", "from a import z\n")
+        graph = _graph(root)
+
+        assert "a.py" not in graph.deferred_edges
+        assert len(graph.cycles) == 1, "顶层导入支撑的边应让这个环在导入期成立"
+
+    def test_type_checking_import_breaks_import_time_cycle(self, tmp_path: Path) -> None:
+        """TYPE_CHECKING 块内的导入运行期永不执行，同样打破导入期环。"""
+        root = tmp_path / "guarded_ring"
+        _write(
+            root,
+            "model.py",
+            "from typing import TYPE_CHECKING\n\nif TYPE_CHECKING:\n    from svc import S\n",
+        )
+        _write(root, "svc.py", "from model import M\n")
+        graph = _graph(root)
+
+        assert graph.cycles == ()
+        assert len(graph.call_time_cycles) == 1
+        assert graph.deferred_edges["model.py"] == frozenset({"svc.py"})
+
+    def test_no_deferred_imports_leaves_deferred_edges_empty(self, ts_repo: Path) -> None:
+        assert _graph(ts_repo).deferred_edges == {}
+
+    def test_call_time_cycle_not_double_counted_as_import_cycle(self, tmp_path: Path) -> None:
+        """两组环互斥且并集为全部环——不重不漏。"""
+        root = tmp_path / "both_rings"
+        # 导入期环：p <-> q。调用期环：r -> s -> r，其中 s 侧是延迟导入。
+        _write(root, "p.py", "from q import x\n")
+        _write(root, "q.py", "from p import y\n")
+        _write(root, "r.py", "from s import x\n")
+        _write(root, "s.py", "def f():\n    from r import y\n    return y\n")
+        graph = _graph(root)
+
+        assert len(graph.cycles) == 1
+        assert set(graph.cycles[0]) == {"p.py", "q.py"}
+        assert len(graph.call_time_cycles) == 1
+        assert set(graph.call_time_cycles[0]) == {"r.py", "s.py"}
+
+
 class TestDegradation:
     def test_over_node_limit_degrades_to_directory(self, py_repo: Path) -> None:
         graph = _graph(py_repo, max_nodes=3)

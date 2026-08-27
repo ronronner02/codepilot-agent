@@ -9,10 +9,15 @@ provider 标识：切换 embedding provider 后向量空间完全不同，而缓
   commit SHA  代码变了，切块与向量都得重算。
   provider    provider 名 + 模型名 + 预处理版本，由 provider.identity 给出。
   切块版本     切块策略改了（粒度、重叠量、超长函数处理），块边界就变了。
+  索引范围     抽样上限（`index_scope`）。抽样索引与全量索引检索时表现相同，只是前者
+              漏内容而不报错——不进键就会让全量分析命中残缺索引。
 
-四者拼成一个稳定的短哈希做目录名。用哈希而非拼接原文的理由：commit SHA 加模型名加仓库
+五者拼成一个稳定的短哈希做目录名。用哈希而非拼接原文的理由：commit SHA 加模型名加仓库
 名很容易超出文件名长度限制，而模型名里的 `/`（如 `jinaai/jina-embeddings-v2`）会被当成
 路径分隔符。
+
+索引范围为空（全量，默认）时不进摘要材料，使全量索引的 digest 与引入该字段之前一致——
+否则升级即让所有已建索引失效，白付一次 embedding 成本。
 """
 
 from __future__ import annotations
@@ -45,6 +50,14 @@ class CacheKey:
     commit_sha: str
     provider_identity: str
     chunk_version: str = CHUNK_STRATEGY_VERSION
+    index_scope: str = ""
+    """索引覆盖范围。空串表示全量（默认），抽样时形如 `top200`。
+
+    **为什么它必须进键**：抽样索引与全量索引在检索时表现相同——都能返回结果，只是抽样
+    的那份漏内容而不报错。键里不含它的话，一次抽样分析之后的全量分析会命中那份残缺索引，
+    于是「我明明跑了全量」与「检索找不到」同时成立，且无任何错误信号。这与 provider 标识
+    必须进键是同一类失效（见模块 docstring）。
+    """
 
     @property
     def digest(self) -> str:
@@ -52,17 +65,24 @@ class CacheKey:
 
         内置 `hash()` 对 str 加了进程级随机盐（PYTHONHASHSEED），跨进程不一致。
         用它做缓存键会让每次重启都全量未命中，而这在单进程测试里发现不了。
+
+        **index_scope 为空时不进摘要材料。** 这让全量索引的 digest 与新增该字段之前
+        完全一致——已经付过 30 分钟建好的索引在升级后仍然命中。无条件拼进去（哪怕是
+        空串）会改变全部现有键，代价是所有人重付一次 embedding 成本，而换来的只是代码
+        少一个分支。
         """
-        material = "\x00".join(
-            (self.repo, self.commit_sha, self.provider_identity, self.chunk_version)
-        )
+        parts = [self.repo, self.commit_sha, self.provider_identity, self.chunk_version]
+        if self.index_scope:
+            parts.append(self.index_scope)
+        material = "\x00".join(parts)
         return hashlib.sha256(material.encode("utf-8")).hexdigest()[:_DIGEST_LENGTH]
 
     def describe(self) -> str:
         """人可读的键说明。缓存未命中时写进日志，便于对比是哪一项变了。"""
+        scope = f" scope={self.index_scope}" if self.index_scope else ""
         return (
             f"repo={self.repo} commit={self.commit_sha[:12]} "
-            f"provider={self.provider_identity} chunks={self.chunk_version}"
+            f"provider={self.provider_identity} chunks={self.chunk_version}{scope}"
         )
 
     def differences(self, other: CacheKey) -> list[str]:
@@ -82,11 +102,33 @@ class CacheKey:
             )
         if self.chunk_version != other.chunk_version:
             diffs.append(f"切块策略版本：{other.chunk_version} -> {self.chunk_version}")
+        if self.index_scope != other.index_scope:
+            diffs.append(
+                f"索引范围：{other.index_scope or '全量'} -> {self.index_scope or '全量'}"
+            )
         return diffs
 
 
-def build_cache_key(repo: str, commit_sha: str, provider_identity: str) -> CacheKey:
-    """构造缓存键。切块版本由模块常量给出，不作为参数——它是代码属性而非运行时输入。"""
+def index_scope_label(max_index_files: int) -> str:
+    """把抽样上限转成键里的范围标签。0（不限）返回空串，即全量。
+
+    独立函数而非内联：调用方有两处（建键与产出说明），而「0 表示全量」这个约定写两遍
+    就会有一处忘记同步。
+    """
+    return f"top{max_index_files}" if max_index_files > 0 else ""
+
+
+def build_cache_key(
+    repo: str, commit_sha: str, provider_identity: str, index_scope: str = ""
+) -> CacheKey:
+    """构造缓存键。切块版本由模块常量给出，不作为参数——它是代码属性而非运行时输入。
+
+    index_scope 反过来必须是参数：它取决于运行时配置（settings.max_index_files），
+    而同一份代码在不同配置下会产出覆盖范围不同的索引。
+    """
     return CacheKey(
-        repo=repo, commit_sha=commit_sha, provider_identity=provider_identity
+        repo=repo,
+        commit_sha=commit_sha,
+        provider_identity=provider_identity,
+        index_scope=index_scope,
     )

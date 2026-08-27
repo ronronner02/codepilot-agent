@@ -12,6 +12,7 @@ import pytest
 
 from backend.static_analysis.models import (
     ImportKind,
+    ImportScope,
     ParsedFile,
     SymbolKind,
     UnparsedFile,
@@ -250,6 +251,109 @@ class TestImports:
         targets = {i.target for i in imports}
         assert "../legacy" in targets
         assert "./namespace" in targets
+
+
+SCOPED_SOURCE = '''\
+from typing import TYPE_CHECKING
+
+import top_level
+
+if TYPE_CHECKING:
+    from guarded import G
+
+if TYPE_CHECKING:
+    pass
+else:
+    from runtime_fallback import R
+
+
+class Holder:
+    from class_body import CB
+
+    def method(self):
+        import method_local
+
+        return method_local
+
+
+def deferred_user():
+    from deferred import D
+
+    return D
+'''
+
+
+class TestImportScope:
+    """import 在导入期是否执行。环检测据此判断一条边算不算（见 ImportScope）。"""
+
+    @pytest.fixture
+    def scoped(self, tmp_path: Path) -> Path:
+        root = tmp_path / "scoped"
+        root.mkdir()
+        (root / "m.py").write_text(SCOPED_SOURCE, encoding="utf-8")
+        return root
+
+    def _scope_of(self, scoped: Path, target: str) -> ImportScope:
+        imports = _parse(scoped, "m.py").imports
+        matched = [i for i in imports if i.target == target]
+        assert len(matched) == 1, f"目标 {target} 未捕获或重复：{[i.target for i in imports]}"
+        return matched[0].scope
+
+    def test_top_level_import_is_module_scope(self, scoped: Path) -> None:
+        assert self._scope_of(scoped, "top_level") is ImportScope.MODULE
+
+    def test_function_body_import_is_deferred(self, scoped: Path) -> None:
+        assert self._scope_of(scoped, "deferred") is ImportScope.DEFERRED
+
+    def test_method_body_import_is_deferred(self, scoped: Path) -> None:
+        """方法体与函数体同一判据——方法名下的 block 仍在 _FUNCTION_NODES 链上。"""
+        assert self._scope_of(scoped, "method_local") is ImportScope.DEFERRED
+
+    def test_type_checking_block_import_is_guarded(self, scoped: Path) -> None:
+        assert self._scope_of(scoped, "guarded") is ImportScope.TYPE_GUARDED
+
+    def test_class_body_import_is_module_scope(self, scoped: Path) -> None:
+        """类体在 class 语句求值时就执行，与顶层无实质差别，故算导入期。"""
+        assert self._scope_of(scoped, "class_body") is ImportScope.MODULE
+
+    def test_else_branch_of_type_checking_is_module_scope(self, scoped: Path) -> None:
+        """`else:` 分支是运行期真正走的那条路，不是「仅供类型检查器」。"""
+        assert self._scope_of(scoped, "runtime_fallback") is ImportScope.MODULE
+
+    def test_plain_if_block_import_is_module_scope(self, tmp_path: Path) -> None:
+        """条件导入但条件与 TYPE_CHECKING 无关时仍算导入期——它在模块加载时会求值。"""
+        root = tmp_path / "plainif"
+        root.mkdir()
+        (root / "m.py").write_text(
+            "import sys\n\nif sys.version_info >= (3, 11):\n    from tomllib import loads\n",
+            encoding="utf-8",
+        )
+        loads = [i for i in _parse(root, "m.py").imports if i.target == "tomllib"]
+        assert len(loads) == 1
+        assert loads[0].scope is ImportScope.MODULE
+
+    def test_typing_qualified_type_checking_recognised(self, tmp_path: Path) -> None:
+        """`if typing.TYPE_CHECKING:` 与裸名写法同样要认。"""
+        root = tmp_path / "qualified"
+        root.mkdir()
+        (root / "m.py").write_text(
+            "import typing\n\nif typing.TYPE_CHECKING:\n    from only_types import T\n",
+            encoding="utf-8",
+        )
+        guarded = [i for i in _parse(root, "m.py").imports if i.target == "only_types"]
+        assert len(guarded) == 1
+        assert guarded[0].scope is ImportScope.TYPE_GUARDED
+
+    def test_typescript_static_import_is_module_scope(self, repo: Path) -> None:
+        """ESM 的静态 import 只能在顶层，所以 TS 侧恒为 MODULE。"""
+        imports = _parse(repo, "src/widget.ts").imports
+        assert imports
+        assert all(i.scope is ImportScope.MODULE for i in imports)
+
+    def test_at_import_time_only_true_for_module_scope(self) -> None:
+        assert ImportScope.MODULE.at_import_time
+        assert not ImportScope.DEFERRED.at_import_time
+        assert not ImportScope.TYPE_GUARDED.at_import_time
 
 
 class TestLanguageCoverage:

@@ -180,6 +180,18 @@ class DependencyGraphModel(BaseModel):
     unresolved: list[UnresolvedImportModel] = Field(default_factory=list)
     """看起来指向仓库内却没解析到的 import。与 external 区分：这是解析规则的缺口。"""
     cycles: list[list[str]] = Field(default_factory=list)
+    """**导入期成立**的环。语义已收窄——延迟导入构成的环不在其中。
+
+    收窄的理由见 `ImportScope`：环上有一条函数作用域的延迟导入，导入期就不构成环，
+    报成循环依赖是误报。那些环在 call_time_cycles 里。
+    """
+    call_time_cycles: list[list[str]] = Field(default_factory=list)
+    """仅调用期成立的环。通常是作者主动规避循环依赖的手段，不是问题。
+
+    与 cycles 分开而非合并的理由：合并等于恢复误报，而只给 cycles 会让「无环」与
+    「环只在调用期成立」两种状态在接口上不可区分——本项目在多处坚持这类区分
+    （零命中 vs 未执行、外部依赖 vs 未解析）。
+    """
     granularity: str = "file"
     degraded_reason: str = ""
     """非空表示图已降级为目录级。R-13 要求显式标注，不静默以粗粒度呈现。"""

@@ -5,13 +5,26 @@
 真实节点。若节点实现写死在 builder 里，每次替换都要改图结构代码，而图结构本身是这
 一层唯一需要保证正确的东西。
 
-节点拓扑（对应技术设计的 LangGraph 节点图）。cluster 之后分三条并行分支：
+节点拓扑（对应技术设计的 LangGraph 节点图）：
 
-    START -> ingest -> parse -> cluster -> planner -> [Send 扇出] -> module_agent
-                                                                          |
-                                                                     synthesize -> END
-                                        -> select_files -> reviewer ------------> END
-                                        -> chunk_and_index -------------------> END
+    START -> ingest -> parse -> cluster -> planner -+-> [Send 扇出] -> module_agent
+                                              |     |                       |
+                                              |     |                  synthesize -> END
+                                              |     +-> chunk_and_index ---------> END
+                                              |
+                                    -> select_files -> reviewer ----------------> END
+
+**「并行」在这张图上的准确含义是 superstep 级，不是节点级。** LangGraph 按 superstep
+推进：同一 superstep 内的节点并发执行，而下一个 superstep 必须等当前 superstep 全部
+结束才启动。所以画在同一层不等于同时开跑，画在不同层则必然串行。实际排布是：
+
+    superstep 4 : planner, select_files
+    superstep 5 : module_agent(×N), reviewer, chunk_and_index
+    superstep 6 : synthesize
+
+这一点此前被这张注释图误导过：索引曾挂在 cluster 上，与 planner、select_files 同层，
+于是模块扇出要等索引跑完（fastapi 实测 30.5 分钟）才启动，而注释图看起来三条分支是
+并行的。索引的入边因此改到 planner 之后——那是一个调度决定，见下面 add_edge 处的说明。
 
 评审分支不接收报告内容（KTD9）：它从 cluster 取骨架，与 synthesize 无数据依赖。这在
 图结构上就成立，不靠约定——reviewer 读不到 report 字段，因为它在 synthesize 之前或
@@ -160,10 +173,9 @@ def build_analysis_graph(
     builder.add_edge("ingest", "parse")
     builder.add_edge("parse", "cluster")
 
-    # cluster 扇出三条并行分支。
+    # cluster 扇出两条分支。索引分支挂在 planner 之后而非这里，理由见下。
     builder.add_edge("cluster", "planner")
     builder.add_edge("cluster", "select_files")
-    builder.add_edge("cluster", "chunk_and_index")
 
     # 报告链路：planner 动态扇出到模块子 Agent，再汇聚。
     builder.add_conditional_edges("planner", fanout_router, [MODULE_AGENT, SYNTHESIZE])
@@ -174,7 +186,30 @@ def build_analysis_graph(
     builder.add_edge("select_files", "reviewer")
     builder.add_edge("reviewer", END)
 
-    # 索引链路。
+    # 索引链路。**入边是 planner，不是 cluster——这是一个调度决定，不是数据依赖。**
+    #
+    # chunk_and_index 只读 parse_outcome 与 centrality，两者在 cluster 之后就齐了，
+    # 所以按数据依赖它本该挂在 cluster 上。但 LangGraph 的 superstep 语义会让那样排布
+    # 产生一个可观测的坏后果：cluster 的三个后继同属一个 superstep，而下一个 superstep
+    # （模块扇出、reviewer）必须等**整个**当前 superstep 结束才启动。索引是这里最慢的
+    # 一段（fastapi 实测 30.5 分钟，占 36.6 分钟总跨度的 83%），于是用户提交后要干等
+    # 30 分钟才看到第一条模块分析——实测「索引跑完前 chat 调用一直停在 2 次」。
+    #
+    # 把它挪到 planner 之后，它就与模块扇出、reviewer 同属一个 superstep，三者真正并行：
+    #
+    #   superstep N   : planner, select_files
+    #   superstep N+1 : module_agent(×N), reviewer, chunk_and_index   ← 并行
+    #   superstep N+2 : synthesize
+    #
+    # 总跨度从 36.6 分钟降到约 31 分钟（索引 30.5 + synthesize），而模块分析的可见时刻
+    # 从 30 分钟提到约 1 分钟。代价是引入一条并不存在的数据依赖——planner 的产出对索引
+    # 毫无用处，这条边纯粹是为了把它排进下一个 superstep。不接受这个代价的替代方案是把
+    # 索引拆成 start/await 两个节点并用进程级注册表传 asyncio.Task，那能再省 0.5 分钟，
+    # 但要多维护一套悬挂任务的清理路径。
+    #
+    # planner 失败不影响它：planner 用 @observed 兜住异常并转成 state 数据（不 fatal），
+    # 所以无论 planner 走没走成 LLM 路径，这条边都会到达。
+    builder.add_edge("planner", "chunk_and_index")
     builder.add_edge("chunk_and_index", END)
 
     if checkpointer is False:

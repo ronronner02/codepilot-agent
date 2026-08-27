@@ -12,7 +12,13 @@ from __future__ import annotations
 
 import tree_sitter as ts
 
-from backend.static_analysis.models import ImportKind, ImportRef, Symbol, SymbolKind
+from backend.static_analysis.models import (
+    ImportKind,
+    ImportRef,
+    ImportScope,
+    Symbol,
+    SymbolKind,
+)
 from backend.static_analysis.parser import node_text
 
 # capture 名到 SymbolKind。两种语言共用一套 capture 命名，故本表也共用。
@@ -146,6 +152,54 @@ def extract_symbols(
     return symbols
 
 
+# `if TYPE_CHECKING:` 的判定标识。三种写法都要认：裸名、`typing.TYPE_CHECKING`、
+# 以及 `import typing as t` 后的 `t.TYPE_CHECKING`。所以按条件表达式的文本包含判定，
+# 不按节点结构——结构判定要为每种写法各写一条规则，而这三种在真实代码里都常见。
+#
+# 误判方向可接受：把含该字样的其它条件（`if not TYPE_CHECKING:`）也算成类型保护，
+# 后果是那条 import 被当成导入期不执行。而 `if not TYPE_CHECKING:` 本身极罕见，
+# 且它包住的 import 通常是运行时的等价实现——错判它只影响环检测，不影响依赖边本身。
+_TYPE_CHECKING_MARK = "TYPE_CHECKING"
+
+
+def _import_scope(statement: ts.Node, source: bytes) -> ImportScope:
+    """判定一条 import 在导入期是否执行。
+
+    沿父节点链上溯，遇到三种情形之一即定性（节点链形态经 probe 实测确认）：
+
+      函数/方法体          -> DEFERRED     `block < function_definition[body] < module`
+      if TYPE_CHECKING 的
+      consequence 分支     -> TYPE_GUARDED `block < if_statement[consequence] < module`
+      走到 module         -> MODULE
+
+    **类体不算延迟**：`block < class_definition[body] < module` 在 class 语句求值时就
+    执行，与顶层无实质差别。所以循环里只认 _FUNCTION_NODES，不认类节点。
+
+    **else 分支不算类型保护**：`if TYPE_CHECKING: ... else: from m import R` 里的 R 是
+    运行期真正走的那条路（实测节点链含 `else_clause[body] < if_statement[alternative]`），
+    只有 consequence 侧才是「仅供类型检查器」。所以判定要核对来路是哪个字段，不能只看
+    祖先里有没有 if_statement。
+
+    先命中者优先：函数体内的 `if TYPE_CHECKING:` 记 DEFERRED 还是 TYPE_GUARDED 都不影响
+    结论（两者 at_import_time 均为假），按自内向外的第一个命中定性即可。
+    """
+    child: ts.Node = statement
+    while True:
+        node = child.parent
+        if node is None:
+            return ImportScope.MODULE
+        if node.type in _FUNCTION_NODES:
+            return ImportScope.DEFERRED
+        if node.type == "if_statement":
+            consequence = node.child_by_field_name("consequence")
+            # 只有从 consequence 上来的才是类型保护分支。
+            if consequence is not None and consequence == child:
+                condition = node.child_by_field_name("condition")
+                if condition is not None and _TYPE_CHECKING_MARK in node_text(source, condition):
+                    return ImportScope.TYPE_GUARDED
+        child = node
+
+
 def _string_value(node: ts.Node, source: bytes) -> str:
     """取字符串字面量的内容，剥掉引号。
 
@@ -178,12 +232,14 @@ def _python_module_import(statement: ts.Node, source: bytes, rel_path: str) -> l
     child_by_field_name——后者只返回第一个，`import os, sys` 会丢掉 sys。
     """
     line = statement.start_point[0] + 1
+    scope = _import_scope(statement, source)
     return [
         ImportRef(
             target=_dotted_target(target, source),
             kind=ImportKind.MODULE,
             path=rel_path,
             line=line,
+            scope=scope,
         )
         for target in statement.children_by_field_name("name")
     ]
@@ -214,6 +270,7 @@ def _python_from_import(statement: ts.Node, source: bytes, rel_path: str) -> lis
             path=rel_path,
             line=statement.start_point[0] + 1,
             names=tuple(names),
+            scope=_import_scope(statement, source),
         )
     ]
 
@@ -264,6 +321,10 @@ def _ts_import(statement: ts.Node, source: bytes, rel_path: str) -> list[ImportR
             path=rel_path,
             line=statement.start_point[0] + 1,
             names=names,
+            # TS 的静态 import 只能在模块顶层（ESM 规范），所以这里实际恒为 MODULE。
+            # 仍走同一个判定而非写死：`import()` 动态导入若将来纳入解析，它天然出现在
+            # 函数体内，届时这条路径已经是对的。
+            scope=_import_scope(statement, source),
         )
     ]
 
@@ -299,6 +360,7 @@ def _ts_reexport(statement: ts.Node, source: bytes, rel_path: str) -> list[Impor
             path=rel_path,
             line=statement.start_point[0] + 1,
             names=names,
+            scope=_import_scope(statement, source),
         )
     ]
 

@@ -249,6 +249,7 @@ def _rich_graph(degraded: bool = False) -> DependencyGraph:
             ),
         ),
         cycles=(("pkg/m7/f0.py", "pkg/m8/f0.py"),),
+        call_time_cycles=(("pkg/m1/f0.py", "pkg/m2/f0.py"),),
         granularity=Granularity.DIRECTORY if degraded else Granularity.FILE,
         degraded_reason="节点数 2400 超出上限 2000，降级为目录级" if degraded else None,
     )
@@ -772,6 +773,18 @@ class TestResultContractExtension:
         assert graph["unresolved"][0]["target"] == "./missing"
         assert graph["unresolved"][0]["reason"] == "未找到对应文件"
         assert graph["cycles"] == [["pkg/m7/f0.py", "pkg/m8/f0.py"]]
+
+    def test_import_time_and_call_time_cycles_are_separate_fields(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        """两类环在接口上必须可区分。
+
+        合并等于恢复那个误报（延迟导入被算成循环依赖）；只给 cycles 则让「无环」与
+        「环只在调用期成立」在接口上不可区分。
+        """
+        graph = self._result(monkeypatch, tmp_path)["dependency_graph"]
+        assert graph["cycles"] == [["pkg/m7/f0.py", "pkg/m8/f0.py"]]
+        assert graph["call_time_cycles"] == [["pkg/m1/f0.py", "pkg/m2/f0.py"]]
 
     def test_commit_sha_available_without_report(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
