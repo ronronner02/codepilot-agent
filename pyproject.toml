@@ -2,7 +2,15 @@
 name = "codepilot-agent"
 version = "0.1.0"
 description = "多 Agent 代码分析助手：输入 GitHub 仓库地址，产出可追溯到文件的架构分析报告"
-requires-python = ">=3.11"
+# 与 backend/Dockerfile 的 python:3.13-slim 对齐。
+#
+# **从 >=3.11 收窄到 >=3.13，因为 3.11 从未被任何东西验证过。** 唯一在查它的是 mypy 的
+# python_version=3.11，而那条现在也查不了：numpy 的新版 stub 用了 3.12+ 的 `type` 语句，
+# mypy 以 3.11 为目标时在解析阶段就报 syntax error（`ignore_missing_imports` 与
+# `follow_imports = skip` 都拦不住——语法错误早于它们生效，实测确认）。
+#
+# 那之后要么声明一份没人验证的兼容性，要么改准。选后者：生产镜像、CI、本地开发全是 3.13。
+requires-python = ">=3.13"
 dependencies = [
     "langgraph>=1.0.6",
     "langchain-core>=0.3",
@@ -31,6 +39,15 @@ dependencies = [
 local-embedding = [
     "sentence-transformers>=3.3",
 ]
+# PDF 导出（U20）。**可选**：weasyprint 需要 libpango、libharfbuzz 与一个中文字体，
+# 镜像约 +80MB。未安装时导出端点的 PDF 分支返回 pdf_unavailable，MD 与 HTML 不受影响
+# ——这是既定的降级路径，不是缺陷。
+#
+# 选它而非 reportlab 或浏览器打印：reportlab 的 CID 字体不嵌入字形，部分阅读器渲染成方块；
+# 浏览器打印零依赖但服务端拿不到失败信号，而 R-40 要求「PDF 生成失败时明确报错」。
+pdf = [
+    "weasyprint>=69.0",
+]
 dev = [
     "pytest>=8.3",
     "pytest-asyncio>=0.24",
@@ -49,7 +66,8 @@ testpaths = ["tests"]
 asyncio_mode = "auto"
 
 [tool.mypy]
-python_version = "3.11"
+# 与 requires-python 及 Dockerfile 一致，理由见 requires-python 处的说明。
+python_version = "3.13"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true

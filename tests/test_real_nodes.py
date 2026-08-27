@@ -14,7 +14,11 @@ from pathlib import Path
 import pytest
 
 from backend.graph.builder import build_analysis_graph
-from backend.graph.real_nodes import collect_repo_files, make_real_nodes
+from backend.graph.real_nodes import (
+    collect_repo_files,
+    make_real_nodes,
+    select_index_files,
+)
 from backend.static_analysis.models import ParsedFile, ParseOutcome
 from tests.support import make_settings
 
@@ -167,7 +171,7 @@ class TestIndexNode:
     def _settings(self, tmp_path: Path):  # type: ignore[no-untyped-def]
         return make_settings(workspace_root=tmp_path / "ws")
 
-    async def _run_index(self, repo: Path, settings, monkeypatch):  # type: ignore[no-untyped-def]
+    async def _run_index(self, repo: Path, settings, monkeypatch, centrality=None):  # type: ignore[no-untyped-def]
         calls: list[int] = []
 
         class _Fake:
@@ -194,6 +198,7 @@ class TestIndexNode:
                 "repo_url": "https://github.com/acme/widget",
                 "commit_sha": "a" * 40,
                 "parse_outcome": parsed["parse_outcome"],
+                "centrality": centrality or {},
             }  # type: ignore[arg-type]
         )
         return result, calls
@@ -235,6 +240,88 @@ class TestIndexNode:
 
         assert _repo_slug("https://github.com/acme/widget") == "acme/widget"
         assert _repo_slug("https://github.com/acme/widget.git") == "acme/widget"
+
+    async def test_sampling_note_appears_in_output(
+        self, repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """抽样必须落进产出说明——检索漏内容不报错，读者要能知道索引是残缺的。"""
+        settings = self._settings(tmp_path)
+        settings = settings.model_copy(update={"max_index_files": 1})
+        result, _ = await self._run_index(repo, settings, monkeypatch)
+        assert "抽样索引" in str(result["index_note"])
+        assert "检索不到" in str(result["index_note"])
+
+    async def test_full_index_has_no_sampling_note(
+        self, repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        settings = self._settings(tmp_path)
+        result, _ = await self._run_index(repo, settings, monkeypatch)
+        assert "抽样" not in str(result["index_note"])
+
+    async def test_sampled_index_does_not_satisfy_full_run(
+        self, repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """抽样索引与全量索引不能互相命中，否则「跑了全量」与「检索找不到」同时成立。"""
+        settings = self._settings(tmp_path)
+        sampled = settings.model_copy(update={"max_index_files": 1})
+
+        first, first_calls = await self._run_index(repo, sampled, monkeypatch)
+        assert first_calls, "抽样首次仍要建索引"
+
+        second, second_calls = await self._run_index(repo, settings, monkeypatch)
+        assert second["index_cache_hit"] is False, "全量不该命中抽样索引"
+        assert second_calls, "全量应重新向量化"
+        assert first["index_digest"] != second["index_digest"]
+
+
+class TestIndexFileSelection:
+    """抽样的选取规则。纯函数，不碰 embedding。"""
+
+    def test_no_limit_returns_all(self) -> None:
+        paths = ["a.py", "b.py", "c.py"]
+        selected, note = select_index_files(paths, {}, 0)
+        assert selected == paths
+        assert note == ""
+
+    def test_under_limit_returns_all(self) -> None:
+        paths = ["a.py", "b.py"]
+        selected, note = select_index_files(paths, {"a.py": 0.9}, 5)
+        assert selected == paths
+        assert note == ""
+
+    def test_samples_by_centrality_descending(self) -> None:
+        """高中心度文件优先——它们是被广泛依赖的，也是问答最可能问到的。"""
+        paths = ["low.py", "high.py", "mid.py"]
+        scores = {"low.py": 0.1, "high.py": 0.9, "mid.py": 0.5}
+        selected, _ = select_index_files(paths, scores, 2)
+        assert set(selected) == {"high.py", "mid.py"}
+
+    def test_selection_is_deterministic_on_ties(self) -> None:
+        """并列时按路径名兜底——否则缓存键相同而索引内容不同。"""
+        paths = [f"m{i}.py" for i in range(6)]
+        scores = dict.fromkeys(paths, 0.5)
+        first, _ = select_index_files(paths, scores, 3)
+        second, _ = select_index_files(list(reversed(paths)), scores, 3)
+        assert first == sorted(first)
+        assert set(first) == set(second)
+
+    def test_missing_centrality_falls_back_to_path_order(self) -> None:
+        """图降级为目录级时全部文件都没有分数，此时退化为路径序，仍然确定。"""
+        paths = ["z.py", "a.py", "m.py"]
+        selected, _ = select_index_files(paths, {}, 2)
+        assert set(selected) == {"a.py", "m.py"}
+
+    def test_note_states_the_ratio_and_consequence(self) -> None:
+        _, note = select_index_files([f"m{i}.py" for i in range(10)], {}, 3)
+        assert "3 / 10" in note
+        assert "MAX_INDEX_FILES=3" in note
+
+    def test_original_order_preserved(self) -> None:
+        """返回时恢复原顺序，让日志与产出可比。"""
+        paths = ["c.py", "a.py", "b.py"]
+        scores = {"a.py": 0.9, "b.py": 0.8, "c.py": 0.1}
+        selected, _ = select_index_files(paths, scores, 2)
+        assert selected == ["a.py", "b.py"]
 
 
 class TestGraphIntegration:

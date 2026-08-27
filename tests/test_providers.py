@@ -7,6 +7,7 @@ identity 的跨进程稳定性是重点：它进入 U9 的缓存键，不稳定�
 from __future__ import annotations
 
 import asyncio
+from typing import Any
 
 import httpx
 import pytest
@@ -18,7 +19,12 @@ from backend.providers.embedding import (
     LocalEmbeddingProvider,
     build_embedding_provider,
 )
-from backend.providers.llm import LLMProvider
+from backend.providers.llm import (
+    GuestCredentials,
+    LLMProvider,
+    credential_identity,
+    reset_gates,
+)
 
 
 def _settings(**overrides: object) -> Settings:
@@ -28,6 +34,18 @@ def _settings(**overrides: object) -> Settings:
     }
     base.update(overrides)
     return Settings(**base)  # type: ignore[arg-type]
+
+
+@pytest.fixture(autouse=True)
+def _clean_gates() -> Any:
+    """闸门是进程级的，用例之间必须清空。
+
+    不清的话上一个用例建立的名额池会被下一个用例按同一凭证身份命中，而两者的上限
+    通常不同——表现为「单独跑通过、连起来跑失败」。
+    """
+    reset_gates()
+    yield
+    reset_gates()
 
 
 def test_llm_tier_maps_to_configured_model() -> None:
@@ -178,6 +196,183 @@ class TestConcurrencyGate:
     async def test_config_default_applies(self) -> None:
         provider = LLMProvider(_settings(llm_max_concurrency=3))
         assert provider._gate._value == 3  # type: ignore[attr-defined]
+
+
+class TestGuestCredentialOverride:
+    """U5：访客凭证按请求覆盖（KTD3）。"""
+
+    def test_all_four_fields_overridden(self) -> None:
+        provider = LLMProvider(
+            _settings(
+                deepseek_base_url="https://server.example",
+                llm_model_flash="server-flash",
+                llm_model_pro="server-pro",
+            ),
+            credentials=GuestCredentials(
+                api_key="guest-key",
+                base_url="https://guest.example",
+                model_flash="guest-flash",
+                model_pro="guest-pro",
+            ),
+        )
+        assert provider.model_for("flash") == "guest-flash"
+        assert provider.model_for("pro") == "guest-pro"
+        assert str(provider._client.base_url).startswith("https://guest.example")
+        assert provider._client.api_key == "guest-key"
+
+    def test_without_credentials_uses_settings(self) -> None:
+        """回归：不传凭证时与本单元之前完全一致。既有 14 处构造点靠这条保证。"""
+        provider = LLMProvider(
+            _settings(
+                deepseek_api_key="server-key",
+                deepseek_base_url="https://server.example",
+                llm_model_flash="server-flash",
+            )
+        )
+        assert provider.model_for("flash") == "server-flash"
+        assert provider._client.api_key == "server-key"
+
+    def test_partial_credentials_fall_back_per_field(self) -> None:
+        """只填 key 的访客用服务端的 base_url 与模型名——逐项回落而非整体二选一。"""
+        provider = LLMProvider(
+            _settings(
+                deepseek_base_url="https://server.example",
+                llm_model_flash="server-flash",
+            ),
+            credentials=GuestCredentials(api_key="guest-key"),
+        )
+        assert provider._client.api_key == "guest-key"
+        assert str(provider._client.base_url).startswith("https://server.example")
+        assert provider.model_for("flash") == "server-flash"
+
+    def test_identity_is_digest_not_plaintext(self) -> None:
+        """Covers NA-02。身份键是摘要——它会进日志与异常文本。"""
+        provider = LLMProvider(
+            _settings(), credentials=GuestCredentials(api_key="sk-secret-abc123")
+        )
+        assert "sk-secret-abc123" not in provider.gate_identity
+        assert "secret" not in provider.gate_identity
+        assert len(provider.gate_identity) == 16
+
+    def test_identity_changes_with_credentials(self) -> None:
+        first = credential_identity("https://a.example", "key-1")
+        second = credential_identity("https://a.example", "key-2")
+        third = credential_identity("https://b.example", "key-1")
+        assert len({first, second, third}) == 3
+
+    def test_identity_is_stable_for_same_credentials(self) -> None:
+        assert credential_identity("https://a", "k") == credential_identity(
+            "https://a", "k"
+        )
+
+
+class TestProcessLevelGate:
+    """闸门从实例级提到进程级（KTD3 的连带后果）。
+
+    **这一条无法由功能测试替代。** 功能全绿时全局在途数仍可能是上限的倍数，而后果
+    （网关 524）只在真实并发下出现。所以这里直接观测在途峰值。
+    """
+
+    @staticmethod
+    def _tracking_provider(
+        credentials: GuestCredentials,
+        limit: int,
+        global_limit: int,
+        counter: dict[str, int],
+    ) -> LLMProvider:
+        """一个把在途数记进 counter 的 provider。"""
+        provider = LLMProvider(
+            _settings(),
+            base_delay=0.0,
+            max_concurrency=limit,
+            global_max_concurrency=global_limit,
+            credentials=credentials,
+        )
+
+        class _Tracking:
+            async def create(self, **kwargs: object) -> str:
+                counter["now"] += 1
+                counter["peak"] = max(counter["peak"], counter["now"])
+                await asyncio.sleep(0.02)
+                counter["now"] -= 1
+                return "ok"
+
+        tracker = _Tracking()
+
+        class _Chat:
+            completions = tracker
+
+        provider._client = type("_Client", (), {"chat": _Chat()})()  # type: ignore[assignment]
+        return provider
+
+    async def test_same_identity_shares_one_pool(self) -> None:
+        """同一凭证身份的两个 provider 共用名额池：在途上限是 2 而非 4。"""
+        counter = {"now": 0, "peak": 0}
+        creds = GuestCredentials(api_key="same-key", base_url="https://gw.example")
+        first = self._tracking_provider(creds, 2, 99, counter)
+        second = self._tracking_provider(creds, 2, 99, counter)
+        assert first.gate_identity == second.gate_identity
+
+        await asyncio.gather(
+            *[first.chat([{"role": "user", "content": "a"}]) for _ in range(4)],
+            *[second.chat([{"role": "user", "content": "b"}]) for _ in range(4)],
+        )
+        assert counter["peak"] <= 2, (
+            f"同一凭证身份的在途峰值为 {counter['peak']}，超过上限 2"
+            "——说明闸门仍是实例级的"
+        )
+
+    async def test_different_identities_do_not_block_each_other(self) -> None:
+        """不同凭证身份各自一池：两个访客可以同时各跑到自己的上限。"""
+        counter = {"now": 0, "peak": 0}
+        alice = self._tracking_provider(
+            GuestCredentials(api_key="k-alice", base_url="https://a.example"),
+            1,
+            99,
+            counter,
+        )
+        bob = self._tracking_provider(
+            GuestCredentials(api_key="k-bob", base_url="https://b.example"),
+            1,
+            99,
+            counter,
+        )
+        assert alice.gate_identity != bob.gate_identity
+
+        await asyncio.gather(
+            *[alice.chat([{"role": "user", "content": "a"}]) for _ in range(3)],
+            *[bob.chat([{"role": "user", "content": "b"}]) for _ in range(3)],
+        )
+        # 各自上限 1，两人不互相阻塞，所以峰值应达到 2。
+        assert counter["peak"] == 2, (
+            f"两个不同凭证身份的在途峰值为 {counter['peak']}，"
+            "为 1 说明它们错误地共用了一个池"
+        )
+
+    async def test_global_cap_bounds_total_in_flight(self) -> None:
+        """全局总闸生效：多个不同身份同时在跑时总在途数不超过全局上限。"""
+        counter = {"now": 0, "peak": 0}
+        providers = [
+            self._tracking_provider(
+                GuestCredentials(api_key=f"k-{i}", base_url=f"https://gw{i}.example"),
+                4,
+                3,
+                counter,
+            )
+            for i in range(4)
+        ]
+
+        await asyncio.gather(
+            *[
+                provider.chat([{"role": "user", "content": "x"}])
+                for provider in providers
+                for _ in range(3)
+            ]
+        )
+        assert counter["peak"] <= 3, (
+            f"全局在途峰值为 {counter['peak']}，超过全局上限 3"
+            "——按身份分池后总量必须另有约束"
+        )
 
 
 class TestTransientUpstreamError:

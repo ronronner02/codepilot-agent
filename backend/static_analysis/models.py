@@ -46,6 +46,41 @@ class ImportKind(str, Enum):
     """`export * from './barrel'` —— 依赖会传递给 barrel 的消费者。"""
 
 
+class ImportScope(str, Enum):
+    """这条 import 在**导入期**是否执行。
+
+    为什么需要这个区分（端到端实跑暴露的误报）：评审曾报出
+    `_compat/v2.py -> params.py -> datastructures.py -> _compat/v2.py` 的循环依赖，
+    但逐边核对后其中两条是函数作用域的延迟导入——导入期不存在这个环，作者正是用
+    延迟导入打破它的。同一份报告的「依赖关系」一节反而正确地把那处延迟导入描述为
+    「主动规避循环依赖的例证」，两处口径互相矛盾：模块子 Agent 读了源码，评审只看图。
+
+    根因是依赖图不区分「导入期依赖」与「调用期依赖」，而环的成立与否恰恰取决于这个
+    区分——Python 在模块加载时求值顶层 import，函数体内的 import 要等到调用才执行。
+    """
+
+    MODULE = "module"
+    """顶层，或类体内。两者都在模块加载时执行，故都算导入期依赖。
+
+    类体也算的理由：`class C: from m import x` 里的 import 在 class 语句求值时就执行，
+    与顶层无实质差别（实测确认节点链为 `block < class_definition[body] < module`）。
+    """
+    DEFERRED = "deferred"
+    """函数或方法体内。调用期才执行，导入期不构成依赖。"""
+    TYPE_GUARDED = "type_guarded"
+    """`if TYPE_CHECKING:` 块内。运行期永不执行，只服务类型检查器。
+
+    与 DEFERRED 分开记而非合并：两者「导入期不成立」的结论相同，但成因不同——前者
+    是运行时的延迟求值，后者根本不会在运行时执行。报告要解释「为什么这个环不成立」
+    时，这两句话不一样。
+    """
+
+    @property
+    def at_import_time(self) -> bool:
+        """导入期是否执行。环检测据此判断一条边算不算。"""
+        return self is ImportScope.MODULE
+
+
 @dataclass(frozen=True)
 class ImportRef:
     """一条 import 声明。target 是原始文本，尚未解析为仓库内路径。
@@ -60,6 +95,8 @@ class ImportRef:
     line: int
     names: tuple[str, ...] = ()
     """具名导入的名字。`from x import a, b` -> ('a', 'b')；模块导入为空。"""
+    scope: ImportScope = ImportScope.MODULE
+    """这条 import 在导入期是否执行。默认 MODULE 使既有构造点（含测试）语义不变。"""
 
 
 @dataclass
@@ -122,6 +159,11 @@ class DependencyGraph:
 
     edges 的方向是「导入方 -> 被导入方」。反向边按需算（reverse_edges），不双向
     存储——两份数据同步是 bug 来源，而图规模有上限，重算成本可忽略。
+
+    **edges 含全部依赖，不区分导入期与调用期。** 这是有意的：延迟导入仍是真实的
+    依赖关系，"谁依赖谁"的架构结论、中心度、聚类都应当算它。只有环的成立与否需要这个
+    区分（见 cycles 与 call_time_cycles），所以区分信息单独放在 deferred_edges 里，
+    而不是从 edges 里剔除。
     """
 
     nodes: tuple[str, ...] = ()
@@ -130,6 +172,25 @@ class DependencyGraph:
     """仓库外依赖：原始 import 目标 -> 导入它的文件集合。"""
     unresolved: tuple[UnresolvedImport, ...] = ()
     cycles: tuple[tuple[str, ...], ...] = ()
+    """**导入期成立**的环。环上每条边都由至少一条模块级 import 支撑。
+
+    语义收窄自「图上的全部有向环」：延迟导入构成的环在导入期不存在（Python 在模块
+    加载时只求值顶层 import），报成循环依赖是误报。那些环归入 call_time_cycles。
+    """
+    call_time_cycles: tuple[tuple[str, ...], ...] = ()
+    """仅在**调用期**成立的环：环上至少有一条边只由延迟导入或类型保护导入支撑。
+
+    通常是作者主动规避循环依赖的手段——正是那条延迟导入打破了导入期的环。所以它不作
+    为发现产出，只在评审范围说明里计数（与「无引用文件」同一取舍：误报率高的信号只留
+    计数）。
+    """
+    deferred_edges: dict[str, frozenset[str]] = field(default_factory=dict)
+    """只由延迟/类型保护导入支撑的边，是 edges 的子集。
+
+    保留它而非只存一个布尔标记：解释「为什么这个环在导入期不成立」时要能指出是哪条边
+    延迟的，而这需要边一级的粒度。同一对文件间既有顶层导入又有延迟导入时不算在内——
+    那条边在导入期确实存在。
+    """
     granularity: Granularity = Granularity.FILE
     degraded_reason: str | None = None
 

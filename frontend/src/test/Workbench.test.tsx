@@ -1,18 +1,21 @@
 /**
  * 工作台外壳与结果统计（PRD 2026-08-25-002 的 AE-01 至 AE-09）。
  *
- * 与 App.test.tsx 分开：那份测的是状态机与 SSE 生命周期，这份测的是改版新增的外壳、
- * 锚点导航与统计口径。两者共用同一批固件，但关注点不同，混在一个文件里会让失败信号
- * 指向不明。
+ * 与 App.test.tsx 分开：那份测的是状态机与 SSE 生命周期，这份测的是外壳、导航与统计口径。
+ * 两者共用同一批固件，但关注点不同，混在一个文件里会让失败信号指向不明。
  *
- * 这里有两条断言是**防回归**而非验功能：三个区块标题必须同时存在（锚点导航不得退化成
- * 视图切换），以及 role="status" / role="alert" 的数量不得增加（统计区不得挂播报角色）。
- * 两者一旦破坏，App.test.tsx 会大面积失败而原因不明显——所以在这里直接钉住。
+ * 这里有两条断言是**防回归**而非验功能：
+ *
+ * - **切页后其它页必须已卸载**（U1 改写后的形态）。原本钉的是「三个区块标题共存」——那是
+ *   锚点滚动形态下的防回归，防的是「有人把锚点改成视图切换」。多页形态推翻了那个前提，
+ *   这条断言的职责因此反转为防止有人把多页改回锚点滚动。同一个防回归意图，相反的形态。
+ * - role="status" / role="alert" 的数量不得增加（统计区不得挂播报角色）。
  */
 
 import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { MemoryRouter } from 'react-router-dom'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../App'
 import type { AnalysisResult, ProgressEvent } from '../api/types'
 import { MockEventSource } from './setup'
@@ -97,6 +100,11 @@ function result(overrides: Partial<AnalysisResult> = {}): AnalysisResult {
       ],
     },
     index: { cache_hit: false, chunk_count: 318, identity: 'api:m:v1', note: '新建索引' },
+    queue_position: 0,
+    commit_sha: 'abcdef123456789',
+    modules: [],
+    dependency_graph: null,
+    language_profile: null,
     module_failures: [],
     ...overrides,
   }
@@ -117,7 +125,17 @@ function stubFetch(overrides: Partial<AnalysisResult> = {}): { calls: string[] }
       const method = init?.method ?? 'GET'
       calls.push(`${method} ${url}`)
       if (method === 'POST') {
-        return json({ task_id: 't1', repo: 'acme/widget', stage: 'queued', message: 'ok' })
+        return json({
+          task_id: 't1',
+          repo: 'acme/widget',
+          stage: 'queued',
+          message: 'ok',
+          queue_position: 0,
+        })
+      }
+      // 历史列表：首页挂载时会拉一次。
+      if (/\/api\/analyses$/.test(url)) {
+        return json([])
       }
       return json(result(overrides))
     }),
@@ -125,9 +143,41 @@ function stubFetch(overrides: Partial<AnalysisResult> = {}): { calls: string[] }
   return { calls }
 }
 
+/** U1 之后必须包 Router。生产入口的 BrowserRouter 在 main.tsx。 */
+function renderApp(initialPath = '/'): ReturnType<typeof render> {
+  return render(
+    <MemoryRouter initialEntries={[initialPath]}>
+      <App />
+    </MemoryRouter>,
+  )
+}
+
+function seedCredentials(): void {
+  window.localStorage.setItem(
+    'codepilot.credentials.v1',
+    JSON.stringify({
+      base_url: 'https://guest.example',
+      api_key: 'guest-key',
+      model_flash: '',
+      model_pro: '',
+    }),
+  )
+}
+
+beforeEach(() => {
+  window.localStorage.clear()
+  seedCredentials()
+})
+
+/**
+ * 跑到完成态。统计条在 Overview 页，提交后即停在那里，不必再切页。
+ *
+ * 等待点从「架构报告」改成统计区：报告迁到 Reports 页了，而这个 helper 的用途是给统计
+ * 断言准备状态。
+ */
 async function completeAnalysis(overrides: Partial<AnalysisResult> = {}): Promise<string[]> {
   const { calls } = stubFetch(overrides)
-  render(<App />)
+  renderApp()
   const user = userEvent.setup()
   await user.type(screen.getByLabelText('GitHub 仓库地址'), REPO)
   await user.click(screen.getByRole('button', { name: '开始分析' }))
@@ -135,14 +185,14 @@ async function completeAnalysis(overrides: Partial<AnalysisResult> = {}): Promis
   await act(async () => {
     MockEventSource.latest().emit(progress({ stage: 'done', label: '完成', percent: 100 }))
   })
-  await screen.findByRole('heading', { name: '架构报告' })
+  await screen.findByLabelText('分析结果统计')
   return calls
 }
 
 describe('工作台外壳', () => {
   it('未提交时顶部条走空态（AE-08）', () => {
     stubFetch()
-    render(<App />)
+    renderApp()
     expect(screen.getByText('未选择仓库')).toBeInTheDocument()
     expect(screen.getByText('未开始')).toBeInTheDocument()
     expect(screen.getByText('尚无任务')).toBeInTheDocument()
@@ -163,27 +213,43 @@ describe('工作台外壳', () => {
     expect(screen.getByText('已完成')).toBeInTheDocument()
   })
 
-  it('结果未就绪时报告/评审/问答导航置灰', () => {
+  it('结果未就绪时依赖结果的导航项置灰并标注原因（R-03）', () => {
     stubFetch()
-    render(<App />)
-    expect(screen.getByRole('button', { name: '概览' })).toBeEnabled()
-    expect(screen.getByRole('button', { name: '报告' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: '评审' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: '问答' })).toBeDisabled()
+    renderApp()
+    // Overview / MCP / Settings 是例外，未就绪时仍可点（R-03）。
+    expect(screen.getByRole('link', { name: 'Overview' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'MCP' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Settings' })).toBeInTheDocument()
+
+    for (const label of ['Architecture', 'AI Chat', 'Code Search', 'Reports']) {
+      const item = screen.getByRole('button', { name: new RegExp(label) })
+      expect(item).toBeDisabled()
+      // AE-01 的「标注原因」由 title/aria-label 满足，不做可见文案（owner 决定）。
+      expect(item).toHaveAttribute('title', '需先完成一次分析')
+      expect(item.textContent).toBe(label)
+    }
   })
 
-  it('点击导航项设为当前项，且三个区块仍全部在 DOM（AE-01）', async () => {
+  it('切页后当前项高亮，且其它页已从 DOM 卸载（AE-01）', async () => {
     await completeAnalysis()
     const user = userEvent.setup()
 
-    const review = screen.getByRole('button', { name: '评审' })
-    await user.click(review)
+    // 切到 Reports：报告出现。
+    await user.click(screen.getByRole('link', { name: 'Reports' }))
+    expect(await screen.findByRole('heading', { name: '架构报告' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Reports' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
 
-    expect(review).toHaveAttribute('aria-current', 'true')
-    // 锚点导航不得退化成视图切换：三个标题必须共存。
-    expect(screen.getByRole('heading', { name: '架构报告' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: '代码评审' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: '代码问答' })).toBeInTheDocument()
+    // 防回归（语义反转）：多页形态下 Overview 的内容必须已卸载。原断言钉「三个标题共存」，
+    // 那是锚点滚动的前提；这条钉「切页即卸载」，防的是有人把多页改回锚点滚动。
+    expect(screen.queryByLabelText('分析结果统计')).not.toBeInTheDocument()
+
+    // 再切到 AI Chat：报告随之卸载。
+    await user.click(screen.getByRole('link', { name: 'AI Chat' }))
+    expect(await screen.findByRole('heading', { name: '代码问答' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: '架构报告' })).not.toBeInTheDocument()
   })
 })
 
@@ -198,8 +264,10 @@ describe('结果统计', () => {
     expect(stats).toHaveTextContent('318索引切块')
     expect(stats).toHaveTextContent('0未完成模块')
 
-    // 统计全部由已有结果派生：只有提交与取结果两次请求。
-    expect(calls.filter((call) => call.startsWith('GET')).length).toBe(1)
+    // 统计全部由已有结果派生：取结果只发一次，统计不额外拉数据。
+    // 收窄到结果端点：首页挂载会拉一次历史列表（GET /api/analyses），那与统计无关。
+    const resultCalls = calls.filter((call) => /GET .*\/api\/analyses\/[^/]+$/.test(call))
+    expect(resultCalls.length).toBe(1)
   })
 
   it('严重度分布按高中低分段并带计数（AE-02）', async () => {
@@ -212,9 +280,14 @@ describe('结果统计', () => {
 
   it('图例文案不与评审徽标文本相同', async () => {
     await completeAnalysis()
-    // 「高」只属于发现列表的徽标；统计图例用「高危 N」，否则按文本查询会多匹配。
-    expect(screen.getByText('高')).toBeInTheDocument()
-    expect(screen.getByText('中')).toBeInTheDocument()
+    // 图例在 Overview 的统计条上，用「高危 N」。
+    expect(screen.getByLabelText('分析结果统计')).toHaveTextContent('高危 1')
+
+    // 徽标「高」在评审页的发现列表里——多页形态下它与统计条不同屏，所以要切页才能断言。
+    // 这条断言原本的意图是「两处文案不同」，而不同屏反而让它更强：两个文案不可能互相干扰。
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('link', { name: 'Structural' }))
+    expect(await screen.findByText('高')).toBeInTheDocument()
   })
 
   it('零发现时统计显示 0 且不渲染空分布条（AE-03）', async () => {

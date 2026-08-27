@@ -21,15 +21,31 @@ WORKDIR /build
 # 让这一层失效并重装依赖；换来的是依赖只有一个来源。
 COPY pyproject.toml ./
 COPY backend ./backend
-RUN pip install --no-cache-dir --prefix=/install .
+# 带 pdf extra：weasyprint 用于报告导出（U20）。它的 Python 包在这里装，而它依赖的系统库
+# 与中文字体在运行阶段装——两者缺一，导出 PDF 时会报 OSError 而非 ImportError。
+RUN pip install --no-cache-dir --prefix=/install ".[pdf]"
 
 FROM python:3.13-slim
 
 # **git 是运行期依赖，不是构建期的。** 后端要 clone 被分析的仓库（U2），
 # 没有它每次分析都会在克隆那一步失败，而错误信息会指向 git 不存在——离「为什么分析不了」
 # 这个现象很远。
+#
+# 其余三项是 weasyprint 的运行期依赖（U20 的 PDF 导出）：
+#
+# - libpango-1.0-0 与 libpangoft2-1.0-0：weasyprint 用 Pango 做文本布局，缺了直接 OSError；
+# - libharfbuzz0b：字形整形，中文的标点与连字靠它；
+# - fonts-noto-cjk：**中文字体**。python:3.13-slim 一个 CJK 字体都没有，而缺字体的表现是
+#   **PDF 里是方块而不是报错**——单元测试断言不了字形，所以这一项只能靠容器实跑核对。
+#
+# 这四项加起来约 +80MB。PDF 是 P1，镜像体积成为问题时可以整段去掉（连带 pyproject 的
+# pdf extra），导出端点会返回 pdf_unavailable 并提示改用 MD 或 HTML。
 RUN apt-get update && apt-get install -y --no-install-recommends \
         git \
+        libpango-1.0-0 \
+        libpangoft2-1.0-0 \
+        libharfbuzz0b \
+        fonts-noto-cjk \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /install /usr/local

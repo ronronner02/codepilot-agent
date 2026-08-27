@@ -10,22 +10,27 @@
 
 import { useEffect, useRef } from 'react'
 import type { Citation, Report } from '../api/types'
+import { CitationLink, formatLocation } from './CitationLink'
 
 interface Props {
   report: Report
   /** 完成后焦点移到报告标题（计划的可访问交互要求）。 */
   focusOnMount: boolean
+  /**
+   * 当前任务。非空时引用变为可点，跳转到查看器并定位（U13，R-12）。
+   *
+   * 传 taskId 而非传一个渲染函数：引用的跳转语义只有一种（去查看器看那个位置），让调用方
+   * 各自决定怎么跳会把 `CitationLink` 的集中收口打散。
+   */
+  taskId?: string
 }
 
+/** 引用的文本形态。与可点引用共用 `formatLocation`——两份实现会在边界上漂移。 */
 function formatCitation(citation: Citation): string {
-  if (citation.line === null) return citation.path
-  if (citation.end_line === null || citation.end_line === citation.line) {
-    return `${citation.path}:${citation.line}`
-  }
-  return `${citation.path}:${citation.line}-${citation.end_line}`
+  return formatLocation(citation.path, citation.line, citation.end_line)
 }
 
-export function ReportView({ report, focusOnMount }: Props) {
+export function ReportView({ report, focusOnMount, taskId = '' }: Props) {
   const headingRef = useRef<HTMLHeadingElement>(null)
 
   useEffect(() => {
@@ -61,8 +66,17 @@ export function ReportView({ report, focusOnMount }: Props) {
                   {claim.citations.length > 0 ? (
                     <ul className="report__citations">
                       {claim.citations.map((citation, citationIndex) => (
-                        <li className="citation" key={`${citation.path}-${citationIndex}`}>
-                          <code>{formatCitation(citation)}</code>
+                        <li key={`${citation.path}-${citationIndex}`}>
+                          {taskId ? (
+                            <CitationLink
+                              taskId={taskId}
+                              path={citation.path}
+                              line={citation.line}
+                              endLine={citation.end_line}
+                            />
+                          ) : (
+                            <code className="citation">{formatCitation(citation)}</code>
+                          )}
                         </li>
                       ))}
                     </ul>

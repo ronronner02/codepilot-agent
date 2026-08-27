@@ -1,38 +1,33 @@
 /**
- * 工作台外壳：左侧锚点导航 + 顶部仓库标识条 + 主内容区。
+ * 工作台外壳：左侧导航 + 顶部概览条 + 主内容区（R-01）。
  *
- * 导航是**锚点滚动**而非视图切换。这不是风格选择：分析完成后「架构报告」「代码评审」
- * 「代码问答」三个区块必须同时留在 DOM 里（既是 U13 的单页无路由约定，也是现有组件行为
- * 测试的前提——三组测试在同一个完成态下各自等自己的标题）。视图切换会让任一时刻只有
- * 一个区块存在。
+ * **导航是路由切换，不是锚点滚动。** U1 之前它靠 `scrollIntoView` 加 IntersectionObserver
+ * 纠正高亮，因为那时五个区块必须同时留在 DOM 里。多页形态下任一时刻只有一页在 DOM——
+ * observer 没有可观测的多个区块，那段逻辑整段删除而非注释掉（DoD 明确点名它是死代码）。
  *
- * 当前项由点击直接确定，IntersectionObserver 只在滚动时纠正。反过来做（只靠 observer）
- * 会让点击后的高亮等一帧滚动才生效，而在没有布局的测试环境里永远不生效。
+ * 当前项由**当前路由**决定，不再由点击设定内部 state。这消掉了一类不一致：浏览器后退时
+ * 路由变了而内部 state 没变，高亮会停在上一页。
+ *
+ * **窄视口转抽屉**（R-04）。用 CSS 媒体查询控制布局，用一个受控的 open 状态控制抽屉的
+ * 展开。不按视口宽度在 JS 里分支渲染：那需要监听 resize 并在测试里 mock 尺寸，而 jsdom
+ * 的元素尺寸恒为 0，那类测试只会得到假绿灯。
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-
-export interface NavItem {
-  id: string
-  label: string
-  enabled: boolean
-}
+import { NavLink, useLocation } from 'react-router-dom'
+import { HOME, NAV_ITEMS, NOT_READY_REASON, SETTINGS, analysisPath } from '../routes/paths'
 
 type Tone = 'idle' | 'busy' | 'ok' | 'bad'
 
 interface Props {
-  /** 仓库标识。空串表示尚未提交，顶部条走空态（R-05）。 */
-  repo: string
-  commitSha: string
-  stageLabel: string
-  stageTone: Tone
-  /**
-   * 当前任务标识。放在侧栏底部而非重复顶部条的阶段文案——顶部条是吸顶的，两处显示同一个
-   * 状态是纯冗余；而任务标识是查后端结果端点时真正要用的值。
-   */
+  /** 当前任务。空串表示还没有分析——导航项指向首页而非某次分析。 */
   taskId: string
-  navItems: NavItem[]
+  /** 分析结果是否就绪。决定依赖结果的导航项是否可点（R-03）。 */
+  ready: boolean
+  /** 顶部概览条。由路由层传入，外壳不关心它的内容（U10 填充）。 */
+  topbar: ReactNode
+  stageTone: Tone
   children: ReactNode
 }
 
@@ -43,94 +38,90 @@ const DOT_TONE: Record<Tone, string> = {
   bad: ' rail__dot--bad',
 }
 
-const STAGE_TONE: Record<Tone, string> = {
-  idle: '',
-  busy: ' topbar__stage--busy',
-  ok: ' topbar__stage--ok',
-  bad: ' topbar__stage--bad',
-}
-
-export function AppShell({
-  repo,
-  commitSha,
-  stageLabel,
-  stageTone,
-  taskId,
-  navItems,
-  children,
-}: Props) {
-  const [active, setActive] = useState(navItems[0]?.id ?? '')
-
-  // 依赖用字符串而非数组：navItems 每次渲染都是新数组，直接依赖会让 effect 每帧重跑。
-  const enabledKey = navItems
-    .filter((item) => item.enabled)
-    .map((item) => item.id)
-    .join(',')
+export function AppShell({ taskId, ready, topbar, stageTone, children }: Props) {
+  const location = useLocation()
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  // 记住上一个路径：只有真正换页时才收起抽屉。查看器改查询参数（换文件）不该收起它。
+  const lastPathRef = useRef(location.pathname)
 
   useEffect(() => {
-    // 测试环境没有 IntersectionObserver，也没有真实滚动——点击设定的高亮已经够用。
-    if (typeof IntersectionObserver === 'undefined') return
-
-    const nodes = enabledKey
-      .split(',')
-      .filter(Boolean)
-      .map((id) => document.getElementById(id))
-      .filter((node): node is HTMLElement => node !== null)
-
-    if (nodes.length === 0) return
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const top = entries
-          .filter((entry) => entry.isIntersecting)
-          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0]
-        if (top) setActive(top.target.id)
-      },
-      // 只认视口上部的区块，否则滚到页尾时最后一个区块永远抢不到高亮。
-      { rootMargin: '-12% 0px -68% 0px' },
-    )
-
-    nodes.forEach((node) => observer.observe(node))
-    return () => observer.disconnect()
-  }, [enabledKey])
-
-  const goto = (id: string) => {
-    setActive(id)
-    const node = document.getElementById(id)
-    if (!node) return
-    // jsdom 无布局实现，scrollIntoView 可能缺失或抛错；高亮不依赖它成功。
-    try {
-      node.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
-    } catch {
-      node.scrollIntoView?.()
+    if (lastPathRef.current !== location.pathname) {
+      lastPathRef.current = location.pathname
+      setDrawerOpen(false)
     }
-  }
+  }, [location.pathname])
 
   return (
     <div className="shell">
-      <aside className="rail">
+      <button
+        type="button"
+        className="shell__drawer-toggle"
+        aria-expanded={drawerOpen}
+        aria-controls="rail-nav"
+        onClick={() => setDrawerOpen((open) => !open)}
+      >
+        {drawerOpen ? '收起导航' : '展开导航'}
+      </button>
+
+      <aside className={drawerOpen ? 'rail rail--open' : 'rail'}>
         <div className="rail__brand">
           <span className="rail__mark" aria-hidden="true" />
           <span>
-            <span className="rail__name">CodePilot</span>
-            <span className="rail__tag">仓库架构分析</span>
+            <NavLink to={HOME} className="rail__name">
+              CodePilot
+            </NavLink>
+            <span className="rail__tag">代码情报工作台</span>
           </span>
         </div>
 
-        <nav className="rail__nav" aria-label="分析结果导航">
+        <nav className="rail__nav" id="rail-nav" aria-label="工作台导航">
           <span className="rail__label">工作区</span>
-          {navItems.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              className={item.id === active ? 'rail__item rail__item--on' : 'rail__item'}
-              disabled={!item.enabled}
-              aria-current={item.id === active ? 'true' : undefined}
-              onClick={() => goto(item.id)}
-            >
-              {item.label}
-            </button>
-          ))}
+          {NAV_ITEMS.map((item) => {
+            const blocked = item.needsResult && (!ready || !taskId)
+            const to = item.absolute ?? (taskId ? analysisPath(taskId, item.page!) : HOME)
+
+            if (blocked) {
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  className="rail__item"
+                  disabled
+                  // 原因放 title 与 aria-label，不做可见文案。
+                  //
+                  // 九项里有七项会同时置灰，每项都挂一句相同的说明就是七行重复噪声——
+                  // owner 明确要求去掉：点不动本身已经说明了状态。悬停与读屏仍能取到原因，
+                  // 所以 AE-01 的「标注原因」没有丢，只是不再占版面。
+                  title={NOT_READY_REASON}
+                  aria-label={`${item.label}（${NOT_READY_REASON}）`}
+                >
+                  {item.label}
+                </button>
+              )
+            }
+
+            return (
+              <NavLink
+                key={item.id}
+                to={to}
+                className={({ isActive }) =>
+                  isActive ? 'rail__item rail__item--on' : 'rail__item'
+                }
+              >
+                {item.label}
+              </NavLink>
+            )
+          })}
+
+          <span className="rail__label">设置</span>
+          <NavLink
+            to={SETTINGS}
+            className={({ isActive }) =>
+              isActive ? 'rail__item rail__item--on' : 'rail__item'
+            }
+          >
+            Settings
+          </NavLink>
         </nav>
 
         <div className="rail__foot">
@@ -142,18 +133,7 @@ export function AppShell({
       </aside>
 
       <div className="stage">
-        <header className="topbar">
-          {repo ? (
-            <span className="topbar__repo">{repo}</span>
-          ) : (
-            <span className="topbar__repo topbar__repo--empty">未选择仓库</span>
-          )}
-          {commitSha ? (
-            <span className="topbar__sha">{commitSha.slice(0, 12)}</span>
-          ) : null}
-          <span className={`topbar__stage${STAGE_TONE[stageTone]}`}>{stageLabel}</span>
-        </header>
-
+        <header className="topbar">{topbar}</header>
         <main className="canvas">
           <div className="column">{children}</div>
         </main>

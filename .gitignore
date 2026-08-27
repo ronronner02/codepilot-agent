@@ -53,6 +53,14 @@ frontend/dist/
 *.tsbuildinfo
 
 # 本地临时产物（实跑脚本、调试输出）
-_*.py
-_*.txt
+#
+# **必须是 `_[^_]*` 而非 `_*`。** 后者同时命中每一个 `__init__.py`，于是 16 个包标记文件
+# 从首个提交起就没进过仓库——本地跑全绿（文件在本地存在），而全新 checkout 里 `backend.tools`
+# 退化成 namespace package，报的是 `ImportError: cannot import name 'TOOL_SCHEMAS' from
+# 'backend.tools' (unknown location)`。那个 `(unknown location)` 是唯一线索。
+#
+# 这个缺陷只有全新 checkout 才暴露，是 CI 首次运行抓到的。`[^_]` 让首字符后必须是非下划线，
+# 因此 `_probe.py` 仍被忽略而 `__init__.py`、`__main__.py` 不受影响。
+_[^_]*.py
+_[^_]*.txt
 *.log

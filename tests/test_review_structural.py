@@ -91,6 +91,75 @@ class TestCycles:
         assert not [f for f in outcome.findings if f.kind == "circular_dependency"]
 
 
+class TestCallTimeCycles:
+    """仅调用期成立的环只计数，不出发现。
+
+    针对的是 fastapi 实跑那次误报：环上两条边是函数作用域的延迟导入，导入期不成立，
+    而报出来的是「3 个文件构成循环依赖」。报出这类环等于让读者去修一处本就正确的规避
+    措施——同一份报告的依赖关系一节反而把它描述为「主动规避循环依赖的例证」。
+    """
+
+    def _with_call_time(
+        self, ring: tuple[str, ...], edges: dict[str, list[str]]
+    ) -> DependencyGraph:
+        """构造一个只含调用期环的图。cycles 为空、call_time_cycles 含该环。"""
+        nodes = sorted({*edges, *(t for ts in edges.values() for t in ts)})
+        return DependencyGraph(
+            nodes=tuple(nodes),
+            edges={n: frozenset(edges.get(n, ())) for n in nodes},
+            cycles=(),
+            call_time_cycles=(ring,),
+        )
+
+    def test_call_time_cycle_produces_no_finding(self) -> None:
+        graph = self._with_call_time(
+            ("a.py", "b.py", "c.py"),
+            {"a.py": ["b.py"], "b.py": ["c.py"], "c.py": ["a.py"]},
+        )
+        outcome = run_structural_checks(graph, [_module("root", tuple(graph.nodes))], [])
+        assert not [f for f in outcome.findings if f.kind == "circular_dependency"]
+
+    def test_call_time_cycle_counted_in_scope(self) -> None:
+        """不报出但要计数——「有几处这样的规避」对读者是有意义的规模信息。"""
+        graph = self._with_call_time(
+            ("a.py", "b.py"), {"a.py": ["b.py"], "b.py": ["a.py"]}
+        )
+        outcome = run_structural_checks(graph, [_module("root", tuple(graph.nodes))], [])
+        assert "1 处环仅在调用期成立" in outcome.scope
+        assert "延迟导入" in outcome.scope
+
+    def test_scope_omits_note_when_no_call_time_cycles(self) -> None:
+        """没有这类环时不多一句话——全量路径是默认，说明只在偏离默认时给。"""
+        graph = _graph({"a.py": ["b.py"], "b.py": []})
+        outcome = run_structural_checks(graph, [_module("root", tuple(graph.nodes))], [])
+        assert "调用期" not in outcome.scope
+
+    def test_scope_states_cycles_are_import_time_only(self) -> None:
+        """范围说明要点明「循环依赖」这一项的口径已收窄，否则读者按旧口径理解。"""
+        graph = _graph({"a.py": ["b.py"], "b.py": ["a.py"]})
+        outcome = run_structural_checks(graph, [_module("root", tuple(graph.nodes))], [])
+        assert "仅导入期成立的环" in outcome.scope
+
+    def test_import_time_and_call_time_cycles_coexist(self) -> None:
+        """两类环同时存在时，只有导入期那个出发现，调用期那个进计数。"""
+        graph = DependencyGraph(
+            nodes=("p.py", "q.py", "r.py", "s.py"),
+            edges={
+                "p.py": frozenset({"q.py"}),
+                "q.py": frozenset({"p.py"}),
+                "r.py": frozenset({"s.py"}),
+                "s.py": frozenset({"r.py"}),
+            },
+            cycles=(("p.py", "q.py"),),
+            call_time_cycles=(("r.py", "s.py"),),
+        )
+        outcome = run_structural_checks(graph, [_module("root", tuple(graph.nodes))], [])
+        cycles = [f for f in outcome.findings if f.kind == "circular_dependency"]
+        assert len(cycles) == 1
+        assert set((cycles[0].path, *cycles[0].related_paths)) == {"p.py", "q.py"}
+        assert "1 处环仅在调用期成立" in outcome.scope
+
+
 class TestZeroHitDistinguishable:
     def test_clean_graph_is_executed_with_zero_hits(self) -> None:
         """零命中必须是「已检查」而非留空——AE2 的核心要求。"""

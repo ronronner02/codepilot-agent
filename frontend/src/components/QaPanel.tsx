@@ -9,6 +9,8 @@
 import { useId, useState } from 'react'
 import { ApiRequestError, NetworkError, askQuestion } from '../api/client'
 import type { Answer } from '../api/types'
+import { loadCredentials } from '../settings/credentials'
+import { CitationLink } from './CitationLink'
 
 interface Props {
   taskId: string
@@ -34,7 +36,8 @@ export function QaPanel({ taskId }: Props) {
     setError('')
     setAnswer(null)
     try {
-      setAnswer(await askQuestion(taskId, trimmed))
+      // 问答同样用访客凭证（BR-004）。embedding 侧仍用服务端配置，那是后端的分流。
+      setAnswer(await askQuestion(taskId, trimmed, loadCredentials()))
     } catch (cause) {
       if (cause instanceof ApiRequestError) {
         setError(
@@ -111,9 +114,13 @@ export function QaPanel({ taskId }: Props) {
                 <ul>
                   {answer.citations.map((citation, index) => (
                     <li key={`${citation.path}-${index}`}>
-                      <code className="citation">
-                        {citation.path}:{citation.start_line}-{citation.end_line}
-                      </code>
+                      {/* 引用可点跳转到查看器（U13、R-28）。 */}
+                      <CitationLink
+                        taskId={taskId}
+                        path={citation.path}
+                        line={citation.start_line}
+                        endLine={citation.end_line}
+                      />
                       {citation.symbol ? (
                         <span className="qa__citation-symbol">{citation.symbol}</span>
                       ) : null}
