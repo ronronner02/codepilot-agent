@@ -1,5 +1,7 @@
 # CodePilot-Agent
 
+[English summary](README.en.md)
+
 输入 GitHub 仓库地址，产出三样东西：**可追溯到具体文件的架构分析报告**、针对该仓库的
 **单轮代码问答**、以及结构/错误处理/安全三类检查的**代码评审**。仓库分析能力同时以
 **MCP server** 形式对外暴露，可被 Claude Code、Cursor 等客户端直接调用。
@@ -75,6 +77,36 @@ cd frontend && npm install && npm run dev
 ```
 
 前端在 <http://localhost:5173>，Vite 的 proxy 会把 `/api` 转到 8000。
+
+## 目录结构
+
+```text
+codepilot-agent/
+├── backend/
+│   ├── api/                  FastAPI 路由与请求响应模型
+│   ├── graph/                LangGraph 编排：Planner、模块子 Agent、Reviewer 的节点与边
+│   ├── static_analysis/      tree-sitter 静态解析：符号表、依赖图、模块聚类、入口点
+│   ├── ingest/               仓库 clone、语言识别、切块
+│   ├── rag/                  向量索引与语义检索
+│   ├── review/               结构 / 错误处理 / 安全三类检查
+│   ├── report/               报告汇总与引用校验（路径存在性、行号越界检查在此）
+│   ├── mcp_server/           MCP server 对外暴露层
+│   ├── providers/            LLM provider 适配
+│   ├── tools/                模块子 Agent 可调用的读码工具
+│   ├── cache/                分析结果缓存
+│   ├── history/              会话与运行记录
+│   └── workspace/            运行时工作区（git 忽略）
+├── frontend/                 前端界面
+├── tests/
+├── docs/
+├── docker-compose.yml
+├── pyproject.toml
+└── .env.example              配置模板，至少需填 DEEPSEEK_API_KEY
+```
+
+两个目录承载了本项目的核心主张：`static_analysis/` 产出全部确定性事实（文件树、import 依赖图、
+模块聚类、入口点、技术栈），不经过 LLM；`report/` 里的引用校验决定一条结论能否进入最终报告——
+路径必须真实存在、行号必须在文件实际行数内，过不了校验的结论会被丢弃并计入缺失说明。
 
 ## 配置
 
